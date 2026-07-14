@@ -1,0 +1,10 @@
+{
+  "name": "resolume-probe",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "description": "M0 integration probe: discover a Resolume Arena composition over REST and fire a clip over OSC.",
+  "dependencies": {
+    "node-osc": "^9.1.4"
+  }
+}
