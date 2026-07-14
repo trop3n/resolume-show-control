@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import type { CompositionModel } from './types'
 import { useTransport } from './hooks/useTransport'
+import { useShow } from './show/useShow'
 import Transport, { fmtTime } from './components/Transport'
+import Timeline from './components/Timeline'
 import ClipGrid from './components/ClipGrid'
 
 const DEFAULT_HOST = '172.16.8.27'
@@ -15,6 +17,7 @@ export default function App(): JSX.Element {
   const [lastFired, setLastFired] = useState<string | null>(null)
 
   const t = useTransport()
+  const show = useShow()
 
   const connect = useCallback(async (h: string) => {
     setError(null)
@@ -105,6 +108,17 @@ export default function App(): JSX.Element {
 
       <Transport t={t} />
 
+      <Timeline
+        buffer={t.buffer}
+        duration={t.duration}
+        bpm={t.bpm}
+        beatOffset={t.beatOffset}
+        getPos={t.position}
+        onSeek={t.seek}
+        layers={comp?.layers ?? []}
+        show={show}
+      />
+
       <main className="grid-wrap">
         {comp ? (
           <ClipGrid comp={comp} host={host} onFire={fire} />
@@ -120,6 +134,7 @@ export default function App(): JSX.Element {
         totals={totals}
         lastFired={lastFired}
         bpm={t.bpm}
+        cues={show.triggers.length}
         getPos={t.position}
       />
     </div>
@@ -133,13 +148,14 @@ function BootSplash({ host }: { host: string }): JSX.Element {
     'OSC BUS :7000 .................... ARMED',
     'LIVE MIRROR ws /api/v1 ........... SUBSCRIBED',
     'AUDIO CLOCK · WEB AUDIO .......... READY',
+    'TIMELINE ENGINE .................. ARMED',
     'LOADING COMPOSITION ..............'
   ]
   return (
     <div className="boot">
       <div className="boot-inner">
         <div className="boot-title">
-          RESOLUME · SHOW CONTROL <span>v0.1.0 · M1</span>
+          RESOLUME · SHOW CONTROL <span>v0.1.0 · M2</span>
         </div>
         {lines.map((l, i) => (
           <div className="boot-line" key={i} style={{ animationDelay: `${i * 160}ms` }}>
@@ -179,6 +195,7 @@ function StatusBar({
   totals,
   lastFired,
   bpm,
+  cues,
   getPos
 }: {
   host: string
@@ -187,6 +204,7 @@ function StatusBar({
   totals: { layers: number; clips: number }
   lastFired: string | null
   bpm: number
+  cues: number
   getPos: () => number
 }): JSX.Element {
   const [clock, setClock] = useState('')
@@ -203,10 +221,11 @@ function StatusBar({
         {totals.layers} LAYERS · {totals.clips} CLIPS
       </span>
       <span className="chip">BPM {bpm}</span>
+      <span className="chip">CUES {cues}</span>
       <LiveTC getPos={getPos} />
       <span className="chip grow">LAST FIRED · {lastFired ?? '—'}</span>
       <span className="chip">{clock}</span>
-      <span className="chip ver">M1</span>
+      <span className="chip ver">M2</span>
     </footer>
   )
 }

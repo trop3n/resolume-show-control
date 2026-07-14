@@ -1,4 +1,5 @@
 import type { CompositionModel } from '../types'
+import { dragState } from '../show/drag'
 
 export default function ClipGrid({
   comp,
@@ -28,7 +29,16 @@ export default function ClipGrid({
                 <button
                   key={clip.index}
                   className={`clip ${clip.connected === 'Connected' ? 'live' : ''}`}
-                  title={`${clip.name} — L${layer.index}/${clip.index}`}
+                  title={`${clip.name} — L${layer.index}/${clip.index} · click to fire · drag onto a lane to schedule`}
+                  draggable
+                  onDragStart={(e) => {
+                    dragState.clip = { layer: layer.index, clip: clip.index, label: clip.name }
+                    e.dataTransfer.effectAllowed = 'copy'
+                    e.dataTransfer.setData('text/plain', `L${layer.index}/${clip.index}`)
+                  }}
+                  onDragEnd={() => {
+                    dragState.clip = null
+                  }}
                   onClick={() => onFire(layer.index, clip.index, clip.name)}
                 >
                   <img

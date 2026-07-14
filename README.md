@@ -59,7 +59,10 @@ mode, Ctrl/⌘-K palette, AI timeline programmer, and multi-machine master/follo
   Arena, proven by the [`probe/`](probe/) and shipped as the live clip grid in the app.
 - **M1 ✅ — Audio master clock.** Song load + waveform + transport + BPM/tap + beat grid,
   driven by the Web Audio clock ([`src/renderer/src/audio/engine.ts`](src/renderer/src/audio/engine.ts)).
-- **M2** timeline editor → **M3** show engine (scheduler + OSC firing) → **M4** song bank +
+- **M2 ✅ — Timeline editor.** Multi-lane authoring (clip + column cues), drag-to-schedule,
+  beat/bar snap, shared playhead ([`src/renderer/src/components/Timeline.tsx`](src/renderer/src/components/Timeline.tsx),
+  [`src/renderer/src/show/`](src/renderer/src/show/)).
+- **M3** show engine (look-ahead scheduler fires the cues over OSC) → **M4** song bank +
   persistence → **M5** aesthetic pass + polish → **M6 (optional)** Link / operator mode / AI programmer.
 
 ## M0: run the probe
@@ -103,6 +106,13 @@ elsewhere).
 - **waveform** with click / drag to seek and a **beat + bar grid** overlaid from the BPM;
 - **transport**: play / pause (**Space**), stop-to-zero, sample-accurate playhead + timecode;
 - **BPM**: manual entry + **TAP** tempo, plus a beat **OFFSET** to line bar 1 up with the downbeat.
+
+**M2 — timeline editor** (author the show; nothing fires yet — that's M3)
+- a **lane per layer** (that has clips) plus a **COLUMNS** lane, sharing one time axis with the waveform;
+- **schedule a clip**: drag it from the grid onto its layer's lane — drops snap to the beat/bar grid;
+- **schedule a column**: double-click the COLUMNS lane; select the cue to step its column number;
+- **edit**: drag a cue to move it (snapped), click to select, **Del** to remove, **CLEAR** to wipe;
+- **SNAP** toggle: OFF / BEAT / BAR. Live playhead scrubs across ruler, waveform and lanes together.
 
 > ⚠️ **Clicking a clip changes live output.** The default host is a real in-use rig, so
 > only run this against a machine you're cleared to drive, or repoint the host first.

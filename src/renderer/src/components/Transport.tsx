@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
 import type { TransportApi } from '../hooks/useTransport'
-import Waveform from './Waveform'
 
 export function fmtTime(sec: number): string {
   if (!isFinite(sec) || sec < 0) sec = 0
@@ -135,15 +134,6 @@ export default function Transport({ t }: { t: TransportApi }): JSX.Element {
           {loadErr ? <span className="songerr">load error: {loadErr}</span> : t.songName ?? 'no song loaded — OPEN or drop an audio file'}
         </div>
       </div>
-
-      <Waveform
-        buffer={t.buffer}
-        duration={t.duration}
-        bpm={t.bpm}
-        beatOffset={t.beatOffset}
-        getPos={t.position}
-        onSeek={t.seek}
-      />
     </section>
   )
 }
