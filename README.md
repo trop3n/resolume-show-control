@@ -148,6 +148,16 @@ elsewhere).
 `npm run build` compiles all three bundles (main / preload / renderer); `npm test` runs the
 scheduler unit tests; `npm run typecheck` runs `tsc`.
 
+### Browser preview (design only)
+
+`npm run web` serves just the renderer as a plain web app on `http://localhost:5199`
+(bound to `0.0.0.0`, so a Windows browser reaches it across WSL2). When it detects it's
+running outside Electron, it installs a **mock backend** ([`platform/mockBackend.ts`](src/renderer/src/platform/mockBackend.ts))
+in place of the main process: sample composition, `localStorage` saves, a file-picker for
+audio. It's for fast look-and-feel iteration with real browser DevTools — **UI only, no
+live Resolume output** (browsers can't send OSC), marked by a PREVIEW badge. The real app
+is still `npm run dev` (Electron).
+
 ## Reference
 
 - REST API: https://resolume.com/docs/restapi/ · https://www.resolume.com/support/en/restapi

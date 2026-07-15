@@ -1,10 +1,14 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import type { LayerModel } from '../types'
 import type { ShowApi } from '../show/useShow'
 import type { ColumnTrigger, SnapRes, Trigger } from '../show/types'
 import { snapTime, timeFromClientX } from '../show/snap'
 import { dragState } from '../show/drag'
 import Waveform from './Waveform'
+
+const GUTTER = 132 // must match --gutter in styles.css
+const BEATS_PER_BAR = 4
+const MAX_CONTENT = 12000 // px cap — keeps the waveform canvas under the browser limit
 
 interface SnapArgs {
   res: SnapRes
@@ -35,22 +39,43 @@ export default function Timeline({
   firedIds: Set<string>
 }): JSX.Element {
   const [snap, setSnap] = useState<SnapRes>('beat')
+  const [zoom, setZoom] = useState(1)
+  const [viewportW, setViewportW] = useState(0)
   const snapArgs: SnapArgs = { res: snap, bpm, beatOffset, duration }
 
-  // live values for the persistent playhead loop
+  const scrollRef = useRef<HTMLDivElement>(null)
+  const phRef = useRef<HTMLDivElement>(null)
+
+  // available track width (excludes the sticky gutter); content width scales with zoom
+  const availW = Math.max(200, viewportW - GUTTER)
+  const contentPx = Math.min(MAX_CONTENT, Math.round(availW * zoom))
+  const atMaxZoom = contentPx >= MAX_CONTENT
+
   const durationRef = useRef(duration)
   const getPosRef = useRef(getPos)
+  const contentRef = useRef(contentPx)
   durationRef.current = duration
   getPosRef.current = getPos
+  contentRef.current = contentPx
 
-  const phRef = useRef<HTMLDivElement>(null)
+  useLayoutEffect(() => {
+    const el = scrollRef.current
+    if (!el) return
+    const ro = new ResizeObserver(() => setViewportW(el.clientWidth))
+    ro.observe(el)
+    setViewportW(el.clientWidth)
+    return () => ro.disconnect()
+  }, [])
+
+  // playhead lives inside the scrolled content, positioned in px
   useEffect(() => {
     let raf = 0
     const loop = (): void => {
       const el = phRef.current
       if (el) {
         const d = durationRef.current
-        el.style.left = d > 0 ? `${(getPosRef.current() / d) * 100}%` : '0%'
+        const frac = d > 0 ? getPosRef.current() / d : 0
+        el.style.transform = `translateX(${GUTTER + frac * contentRef.current}px)`
       }
       raf = requestAnimationFrame(loop)
     }
@@ -76,6 +101,13 @@ export default function Timeline({
 
   const lanes = layers.filter((l) => l.clips.some((c) => c.hasContent))
 
+  const fit = (): void => {
+    setZoom(1)
+    scrollRef.current?.scrollTo({ left: 0 })
+  }
+  const zoomIn = (): void => setZoom((z) => Math.min(64, z * 1.6))
+  const zoomOut = (): void => setZoom((z) => Math.max(1, z / 1.6))
+
   if (duration <= 0) {
     return (
       <section className="timeline empty-tl">
@@ -84,15 +116,30 @@ export default function Timeline({
     )
   }
 
-  // bar ticks for the ruler
+  // grid geometry
+  const beatDur = bpm > 0 ? 60 / bpm : 0
+  const barDur = beatDur * BEATS_PER_BAR
+  const pxPerBeat = beatDur > 0 ? contentPx * (beatDur / duration) : 0
+  const pxPerBar = pxPerBeat * BEATS_PER_BAR
+  const showBeats = pxPerBeat >= 9
+  const labelEvery = pxPerBar >= 44 ? 1 : pxPerBar >= 22 ? 2 : pxPerBar >= 11 ? 4 : 8
+
   const bars: { x: number; n: number }[] = []
-  if (bpm > 0) {
-    const bar = (60 / bpm) * 4
-    for (let m = 0, t = beatOffset; t <= duration; m++, t = beatOffset + m * bar) {
-      if (t >= 0) bars.push({ x: (t / duration) * 100, n: m + 1 })
+  const beats: number[] = []
+  if (beatDur > 0) {
+    const iStart = Math.ceil((0 - beatOffset) / beatDur)
+    const iEnd = Math.floor((duration - beatOffset) / beatDur)
+    for (let i = iStart; i <= iEnd; i++) {
+      const t = beatOffset + i * beatDur
+      if (t < 0) continue
+      const x = (t / duration) * 100
+      const isBar = ((i % BEATS_PER_BAR) + BEATS_PER_BAR) % BEATS_PER_BAR === 0
+      if (isBar) bars.push({ x, n: Math.round(i / BEATS_PER_BAR) + 1 })
+      else if (showBeats) beats.push(x)
     }
   }
-  const labelEvery = bars.length > 64 ? 8 : bars.length > 32 ? 4 : 1
+
+  const cssVars = { ['--content' as string]: `${contentPx}px` }
 
   return (
     <section className="timeline">
@@ -101,74 +148,115 @@ export default function Timeline({
         <span className="tl-snap">
           SNAP
           {(['off', 'beat', 'bar'] as SnapRes[]).map((r) => (
-            <button
-              key={r}
-              className={`seg ${snap === r ? 'on' : ''}`}
-              onClick={() => setSnap(r)}
-            >
+            <button key={r} className={`seg ${snap === r ? 'on' : ''}`} onClick={() => setSnap(r)}>
               {r.toUpperCase()}
             </button>
           ))}
         </span>
-        <span className="tl-hint">drag clips onto a lane · double-click the COLUMNS lane · Del removes</span>
+        <span className="tl-zoom">
+          ZOOM
+          <button className="seg" onClick={zoomOut} disabled={zoom <= 1} title="Zoom out">
+            −
+          </button>
+          <button className="seg" onClick={fit} title="Fit whole song">
+            {zoom <= 1 ? 'FIT' : `${zoom.toFixed(1)}×`}
+          </button>
+          <button className="seg" onClick={zoomIn} disabled={atMaxZoom} title="Zoom in">
+            +
+          </button>
+        </span>
+        <span className="tl-hint">drag clips onto a lane · double-click COLUMNS · Del removes</span>
         <span className="tl-count">{show.triggers.length} CUES</span>
         <button className="seg danger" onClick={show.clear} disabled={show.triggers.length === 0}>
           CLEAR
         </button>
       </div>
 
-      <div className="tl-scroll">
-        {/* ruler */}
-        <div className="tl-row ruler">
-          <div className="tl-gutter">BARS</div>
-          <div
-            className="tl-track ruler-track"
-            onClick={(e) => onSeek(timeFromClientX(e.clientX, e.currentTarget, duration))}
-          >
-            {bars.map((b) => (
-              <div key={b.n} className="bar-tick" style={{ left: `${b.x}%` }}>
-                {(b.n - 1) % labelEvery === 0 && <span className="bar-n">{b.n}</span>}
+      <div className="tl-scroll" ref={scrollRef}>
+        <div className="tl-inner" style={cssVars}>
+          {/* ruler — numbers only; the lines come from the grid overlay */}
+          <div className="tl-row ruler">
+            <div className="tl-gutter">BARS</div>
+            <div
+              className="tl-track ruler-track"
+              onClick={(e) => onSeek(timeFromClientX(e.clientX, e.currentTarget, duration))}
+            >
+              {bars.map(
+                (b) =>
+                  (b.n - 1) % labelEvery === 0 && (
+                    <span key={b.n} className="bar-n" style={{ left: `${b.x}%` }}>
+                      {b.n}
+                    </span>
+                  )
+              )}
+            </div>
+          </div>
+
+          {/* waveform — shares the exact time axis with the lanes below */}
+          <div className="tl-row wave">
+            <div className="tl-gutter">WAVE</div>
+            <div className="tl-track">
+              <Waveform buffer={buffer} duration={duration} getPos={getPos} onSeek={onSeek} />
+            </div>
+          </div>
+
+          {/* one lane per layer with content */}
+          {lanes.map((layer) => (
+            <div className="tl-row lane" key={layer.index}>
+              <div className="tl-gutter" title={layer.name}>
+                <span className="g-num">L{layer.index}</span>
+                <span className="g-name">{layer.name || '—'}</span>
               </div>
-            ))}
-          </div>
-        </div>
+              <div
+                className="tl-track lane-track"
+                onClick={() => show.select(null)}
+                onDragOver={(e) => {
+                  const d = dragState.clip
+                  if (d && d.layer === layer.index) {
+                    e.preventDefault()
+                    e.dataTransfer.dropEffect = 'copy'
+                  }
+                }}
+                onDrop={(e) => {
+                  const d = dragState.clip
+                  if (!d || d.layer !== layer.index || duration <= 0) return
+                  e.preventDefault()
+                  const t = snapTime(
+                    timeFromClientX(e.clientX, e.currentTarget, duration),
+                    snap,
+                    bpm,
+                    beatOffset,
+                    duration
+                  )
+                  show.addClip(d.layer, d.clip, t, d.label)
+                }}
+              >
+                {show.triggers
+                  .filter((t): t is Trigger => t.kind === 'clip' && t.layer === layer.index)
+                  .map((t) => (
+                    <TriggerChip
+                      key={t.id}
+                      trig={t}
+                      show={show}
+                      snapArgs={snapArgs}
+                      fired={firedIds.has(t.id)}
+                    />
+                  ))}
+              </div>
+            </div>
+          ))}
 
-        {/* waveform — shares the exact time axis with the lanes below */}
-        <div className="tl-row wave">
-          <div className="tl-gutter">WAVE</div>
-          <div className="tl-track">
-            <Waveform
-              buffer={buffer}
-              duration={duration}
-              bpm={bpm}
-              beatOffset={beatOffset}
-              getPos={getPos}
-              onSeek={onSeek}
-            />
-          </div>
-        </div>
-
-        {/* one lane per layer with content */}
-        {lanes.map((layer) => (
-          <div className="tl-row lane" key={layer.index}>
-            <div className="tl-gutter" title={layer.name}>
-              <span className="g-num">L{layer.index}</span>
-              <span className="g-name">{layer.name || '—'}</span>
+          {/* columns lane */}
+          <div className="tl-row lane cols">
+            <div className="tl-gutter">
+              <span className="g-num">▦</span>
+              <span className="g-name">COLUMNS</span>
             </div>
             <div
               className="tl-track lane-track"
               onClick={() => show.select(null)}
-              onDragOver={(e) => {
-                const d = dragState.clip
-                if (d && d.layer === layer.index) {
-                  e.preventDefault()
-                  e.dataTransfer.dropEffect = 'copy'
-                }
-              }}
-              onDrop={(e) => {
-                const d = dragState.clip
-                if (!d || d.layer !== layer.index || duration <= 0) return
-                e.preventDefault()
+              onDoubleClick={(e) => {
+                if (duration <= 0) return
                 const t = snapTime(
                   timeFromClientX(e.clientX, e.currentTarget, duration),
                   snap,
@@ -176,11 +264,11 @@ export default function Timeline({
                   beatOffset,
                   duration
                 )
-                show.addClip(d.layer, d.clip, t, d.label)
+                show.addColumn(t, 1)
               }}
             >
               {show.triggers
-                .filter((t): t is Trigger => t.kind === 'clip' && t.layer === layer.index)
+                .filter((t): t is Trigger => t.kind === 'column')
                 .map((t) => (
                   <TriggerChip
                     key={t.id}
@@ -188,51 +276,25 @@ export default function Timeline({
                     show={show}
                     snapArgs={snapArgs}
                     fired={firedIds.has(t.id)}
+                    editableColumn
                   />
                 ))}
             </div>
           </div>
-        ))}
 
-        {/* columns lane */}
-        <div className="tl-row lane cols">
-          <div className="tl-gutter">
-            <span className="g-num">▦</span>
-            <span className="g-name">COLUMNS</span>
+          {/* grid overlay + playhead — span every row, aligned to the same axis */}
+          <div className="tl-grid">
+            {beats.map((x, i) => (
+              <div key={`bt${i}`} className="gl beat" style={{ left: `${x}%` }} />
+            ))}
+            {bars.map((b) => (
+              <div key={`br${b.n}`} className="gl bar" style={{ left: `${b.x}%` }} />
+            ))}
           </div>
-          <div
-            className="tl-track lane-track"
-            onClick={() => show.select(null)}
-            onDoubleClick={(e) => {
-              if (duration <= 0) return
-              const t = snapTime(
-                timeFromClientX(e.clientX, e.currentTarget, duration),
-                snap,
-                bpm,
-                beatOffset,
-                duration
-              )
-              show.addColumn(t, 1)
-            }}
-          >
-            {show.triggers
-              .filter((t): t is Trigger => t.kind === 'column')
-              .map((t) => (
-                <TriggerChip
-                  key={t.id}
-                  trig={t}
-                  show={show}
-                  snapArgs={snapArgs}
-                  fired={firedIds.has(t.id)}
-                  editableColumn
-                />
-              ))}
+          <div className="tl-playhead" ref={phRef}>
+            <div className="ph-line" />
           </div>
         </div>
-      </div>
-
-      <div className="tl-playhead" ref={phRef}>
-        <div className="ph-line" />
       </div>
     </section>
   )
@@ -255,7 +317,8 @@ function TriggerChip({
   const moving = useRef(false)
   const selected = show.selectedId === trig.id
   const left = snapArgs.duration > 0 ? (trig.time / snapArgs.duration) * 100 : 0
-  const label = trig.kind === 'clip' ? `${trig.clip}·${trig.label}` : `COL ${(trig as ColumnTrigger).column}`
+  const label =
+    trig.kind === 'clip' ? `${trig.clip}·${trig.label}` : `COL ${(trig as ColumnTrigger).column}`
 
   return (
     <div

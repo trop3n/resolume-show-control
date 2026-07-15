@@ -1,6 +1,14 @@
 import type { CompositionModel } from '../types'
 import { dragState } from '../show/drag'
 
+// Shown when a thumbnail can't load (rig unreachable, or browser preview) — keeps the
+// grid looking populated instead of showing broken-image icons.
+const FALLBACK_THUMB =
+  'data:image/svg+xml;utf8,' +
+  encodeURIComponent(
+    '<svg xmlns="http://www.w3.org/2000/svg" width="104" height="58"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#0e2a33"/><stop offset="1" stop-color="#0a1418"/></linearGradient></defs><rect width="104" height="58" fill="url(#g)"/></svg>'
+  )
+
 export default function ClipGrid({
   comp,
   host,
@@ -46,6 +54,10 @@ export default function ClipGrid({
                     loading="lazy"
                     alt=""
                     src={`http://${host}:8080/api/v1/composition/layers/${layer.index}/clips/${clip.index}/thumbnail`}
+                    onError={(e) => {
+                      const img = e.currentTarget
+                      if (img.src !== FALLBACK_THUMB) img.src = FALLBACK_THUMB
+                    }}
                   />
                   <span className="cname">{clip.name}</span>
                   <span className="cidx">{clip.index}</span>
