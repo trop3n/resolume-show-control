@@ -411,6 +411,15 @@ body {
   overflow: hidden;
   text-overflow: ellipsis;
 }
+.tl-sel {
+  flex: 1;
+  color: var(--accent);
+  font-size: 10px;
+  letter-spacing: 0.5px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
 .tl-count {
   color: var(--accent);
   font-size: 10px;
@@ -818,6 +827,25 @@ body {
   to {
     opacity: 1;
     transform: none;
+  }
+}
+.boot-bar {
+  margin-top: 16px;
+  height: 2px;
+  background: #10161b;
+  border-radius: 2px;
+  overflow: hidden;
+}
+.boot-fill {
+  height: 100%;
+  width: 0;
+  background: linear-gradient(90deg, var(--accent-dim), var(--accent));
+  box-shadow: 0 0 10px var(--accent);
+  animation: bootfill 1.15s ease-out forwards;
+}
+@keyframes bootfill {
+  to {
+    width: 100%;
   }
 }
 

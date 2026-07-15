@@ -5,6 +5,7 @@ import type { ColumnTrigger, SnapRes, Trigger } from '../show/types'
 import { snapTime, timeFromClientX } from '../show/snap'
 import { dragState } from '../show/drag'
 import Waveform from './Waveform'
+import { fmtTime } from './Transport'
 
 const GUTTER = 132 // must match --gutter in styles.css
 const BEATS_PER_BAR = 4
@@ -26,7 +27,8 @@ export default function Timeline({
   onSeek,
   layers,
   show,
-  firedIds
+  firedIds,
+  playing
 }: {
   buffer: AudioBuffer | null
   duration: number
@@ -37,6 +39,7 @@ export default function Timeline({
   layers: LayerModel[]
   show: ShowApi
   firedIds: Set<string>
+  playing: boolean
 }): JSX.Element {
   const [snap, setSnap] = useState<SnapRes>('beat')
   const [zoom, setZoom] = useState(1)
@@ -54,9 +57,11 @@ export default function Timeline({
   const durationRef = useRef(duration)
   const getPosRef = useRef(getPos)
   const contentRef = useRef(contentPx)
+  const playingRef = useRef(playing)
   durationRef.current = duration
   getPosRef.current = getPos
   contentRef.current = contentPx
+  playingRef.current = playing
 
   useLayoutEffect(() => {
     const el = scrollRef.current
@@ -67,15 +72,27 @@ export default function Timeline({
     return () => ro.disconnect()
   }, [])
 
-  // playhead lives inside the scrolled content, positioned in px
+  // playhead lives inside the scrolled content, positioned in px; while playing zoomed
+  // in, keep it in view (page-scroll when it drifts outside the middle 80%)
   useEffect(() => {
     let raf = 0
     const loop = (): void => {
+      const d = durationRef.current
+      const content = contentRef.current
+      const frac = d > 0 ? getPosRef.current() / d : 0
       const el = phRef.current
-      if (el) {
-        const d = durationRef.current
-        const frac = d > 0 ? getPosRef.current() / d : 0
-        el.style.transform = `translateX(${GUTTER + frac * contentRef.current}px)`
+      if (el) el.style.transform = `translateX(${GUTTER + frac * content}px)`
+
+      const scroll = scrollRef.current
+      if (playingRef.current && scroll) {
+        const viewTrackW = scroll.clientWidth - GUTTER
+        if (content > viewTrackW) {
+          const p = frac * content
+          const left = scroll.scrollLeft
+          if (p < left + viewTrackW * 0.1 || p > left + viewTrackW * 0.9) {
+            scroll.scrollLeft = Math.max(0, Math.min(content - viewTrackW, p - viewTrackW * 0.5))
+          }
+        }
       }
       raf = requestAnimationFrame(loop)
     }
@@ -83,7 +100,7 @@ export default function Timeline({
     return () => cancelAnimationFrame(raf)
   }, [])
 
-  // Delete / Backspace removes the selected trigger; Escape clears selection.
+  // Selected cue: Del/Backspace removes, Esc deselects, ←/→ nudge by a beat (Shift = bar).
   useEffect(() => {
     const onKey = (e: KeyboardEvent): void => {
       const el = e.target as HTMLElement | null
@@ -93,11 +110,18 @@ export default function Timeline({
         show.remove(show.selectedId)
       } else if (e.key === 'Escape') {
         show.select(null)
+      } else if ((e.key === 'ArrowLeft' || e.key === 'ArrowRight') && show.selectedId) {
+        const trig = show.triggers.find((t) => t.id === show.selectedId)
+        if (!trig) return
+        e.preventDefault()
+        const beat = bpm > 0 ? 60 / bpm : 0.1
+        const step = (e.shiftKey ? beat * BEATS_PER_BAR : beat) * (e.key === 'ArrowLeft' ? -1 : 1)
+        show.move(trig.id, Math.max(0, Math.min(duration, trig.time + step)))
       }
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [show])
+  }, [show, bpm, duration])
 
   const lanes = layers.filter((l) => l.clips.some((c) => c.hasContent))
 
@@ -141,6 +165,13 @@ export default function Timeline({
 
   const cssVars = { ['--content' as string]: `${contentPx}px` }
 
+  const selected = show.selectedId
+    ? show.triggers.find((t) => t.id === show.selectedId)
+    : undefined
+  const selLabel = selected
+    ? `${selected.kind === 'clip' ? `L${selected.layer}·${selected.clip}` : `COL ${selected.column}`} @ ${fmtTime(selected.time)}`
+    : null
+
   return (
     <section className="timeline">
       <div className="tl-head">
@@ -165,7 +196,11 @@ export default function Timeline({
             +
           </button>
         </span>
-        <span className="tl-hint">drag clips onto a lane · double-click COLUMNS · Del removes</span>
+        {selLabel ? (
+          <span className="tl-sel">SEL {selLabel} · ←/→ nudge</span>
+        ) : (
+          <span className="tl-hint">drag clips onto a lane · double-click COLUMNS · Del removes</span>
+        )}
         <span className="tl-count">{show.triggers.length} CUES</span>
         <button className="seg danger" onClick={show.clear} disabled={show.triggers.length === 0}>
           CLEAR

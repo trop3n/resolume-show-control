@@ -194,6 +194,7 @@ export default function App(): JSX.Element {
         layers={comp?.layers ?? []}
         show={show}
         firedIds={firedIds}
+        playing={t.state === 'playing'}
       />
 
       <main className="grid-wrap">
@@ -236,7 +237,7 @@ function BootSplash({ host }: { host: string }): JSX.Element {
     <div className="boot">
       <div className="boot-inner">
         <div className="boot-title">
-          RESOLUME · SHOW CONTROL <span>v0.1.0 · M4</span>
+          RESOLUME · SHOW CONTROL <span>v0.1.0 · M5</span>
         </div>
         {lines.map((l, i) => (
           <div className="boot-line" key={i} style={{ animationDelay: `${i * 160}ms` }}>
@@ -244,6 +245,9 @@ function BootSplash({ host }: { host: string }): JSX.Element {
             {l}
           </div>
         ))}
+        <div className="boot-bar">
+          <div className="boot-fill" />
+        </div>
       </div>
     </div>
   )
@@ -306,7 +310,7 @@ function StatusBar({
       <LiveTC getPos={getPos} />
       <span className="chip grow">LAST FIRED · {lastFired ?? '—'}</span>
       <span className="chip">{clock}</span>
-      <span className="chip ver">M4</span>
+      <span className="chip ver">M5</span>
     </footer>
   )
 }
