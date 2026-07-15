@@ -1,10 +1,15 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import type { CompositionModel } from './types'
+import type { Trigger } from './show/types'
 import { useTransport } from './hooks/useTransport'
 import { useShow } from './show/useShow'
+import { useShowEngine } from './show/useShowEngine'
+import { useSongBank } from './persist/useSongBank'
 import Transport, { fmtTime } from './components/Transport'
+import ShowBar from './components/ShowBar'
 import Timeline from './components/Timeline'
 import ClipGrid from './components/ClipGrid'
+import SongBank from './components/SongBank'
 
 const DEFAULT_HOST = '172.16.8.27'
 
@@ -15,9 +20,13 @@ export default function App(): JSX.Element {
   const [error, setError] = useState<string | null>(null)
   const [booting, setBooting] = useState(true)
   const [lastFired, setLastFired] = useState<string | null>(null)
+  const [armed, setArmed] = useState(false)
+  const [firedIds, setFiredIds] = useState<Set<string>>(() => new Set())
+  const [bankOpen, setBankOpen] = useState(false)
 
   const t = useTransport()
   const show = useShow()
+  const bank = useSongBank(t, show)
 
   const connect = useCallback(async (h: string) => {
     setError(null)
@@ -47,24 +56,74 @@ export default function App(): JSX.Element {
     return () => window.clearTimeout(timer)
   }, [connect])
 
-  // Spacebar toggles transport — unless the user is typing in a field.
+  // Global keys: Space toggles transport, Ctrl/Cmd-S saves the show.
   useEffect(() => {
     const onKey = (e: KeyboardEvent): void => {
       const el = e.target as HTMLElement | null
       const typing = el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA')
-      if (e.code === 'Space' && !typing) {
+      if ((e.metaKey || e.ctrlKey) && (e.key === 's' || e.key === 'S')) {
+        e.preventDefault()
+        void bank.save()
+      } else if (e.code === 'Space' && !typing) {
         e.preventDefault()
         t.toggle()
       }
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [t])
+  }, [t, bank])
 
+  // brief green flash on a cue chip when it fires
+  const pulse = useCallback((id: string) => {
+    setFiredIds((s) => new Set(s).add(id))
+    window.setTimeout(() => {
+      setFiredIds((s) => {
+        const n = new Set(s)
+        n.delete(id)
+        return n
+      })
+    }, 260)
+  }, [])
+
+  // Manual fire from the clip grid — always live: it's an explicit operator action,
+  // not gated by ARM (ARM only gates the automated timeline).
   const fire = useCallback(async (layer: number, clip: number, name: string) => {
     await window.api.fireClip(layer, clip)
     setLastFired(`L${layer}·${clip} ${name}`.trim())
   }, [])
+
+  // Automated dispatch from the show engine.
+  const dispatch = useCallback(
+    (trig: Trigger) => {
+      if (trig.kind === 'clip') {
+        window.api.fireClip(trig.layer, trig.clip)
+        setLastFired(`▸ L${trig.layer}·${trig.clip} ${trig.label}`.trim())
+      } else {
+        window.api.fireColumn(trig.column)
+        setLastFired(`▸ COL ${trig.column}`)
+      }
+      pulse(trig.id)
+    },
+    [pulse]
+  )
+
+  useShowEngine({
+    triggers: show.triggers,
+    isPlaying: t.state === 'playing',
+    armed,
+    position: t.position,
+    getEpoch: t.getEpoch,
+    dispatch
+  })
+
+  // PANIC: halt the transport + disarm (guarantees no further cue fires), then a
+  // best-effort blackout of the wall.
+  const panic = useCallback(() => {
+    t.stop()
+    setArmed(false)
+    window.api.disconnectAll()
+    setLastFired('■ PANIC · disconnect all')
+  }, [t])
 
   const totals = useMemo(() => {
     if (!comp) return { layers: 0, clips: 0 }
@@ -106,7 +165,24 @@ export default function App(): JSX.Element {
         </div>
       )}
 
-      <Transport t={t} />
+      <Transport
+        t={t}
+        showName={bank.name}
+        dirty={bank.dirty}
+        onOpenAudio={bank.openAudio}
+        onDropFile={bank.loadDropped}
+        onOpenBank={() => setBankOpen(true)}
+      />
+
+      <ShowBar
+        armed={armed}
+        live={armed && t.state === 'playing'}
+        connected={connected}
+        triggers={show.triggers}
+        getPos={t.position}
+        onToggleArm={() => setArmed((a) => !a)}
+        onPanic={panic}
+      />
 
       <Timeline
         buffer={t.buffer}
@@ -117,6 +193,7 @@ export default function App(): JSX.Element {
         onSeek={t.seek}
         layers={comp?.layers ?? []}
         show={show}
+        firedIds={firedIds}
       />
 
       <main className="grid-wrap">
@@ -137,6 +214,8 @@ export default function App(): JSX.Element {
         cues={show.triggers.length}
         getPos={t.position}
       />
+
+      <SongBank bank={bank} open={bankOpen} onClose={() => setBankOpen(false)} />
     </div>
   )
 }
@@ -148,14 +227,16 @@ function BootSplash({ host }: { host: string }): JSX.Element {
     'OSC BUS :7000 .................... ARMED',
     'LIVE MIRROR ws /api/v1 ........... SUBSCRIBED',
     'AUDIO CLOCK · WEB AUDIO .......... READY',
-    'TIMELINE ENGINE .................. ARMED',
+    'TIMELINE ENGINE .................. LOADED',
+    'SHOW SCHEDULER ................... SAFE',
+    'SONG BANK ........................ MOUNTED',
     'LOADING COMPOSITION ..............'
   ]
   return (
     <div className="boot">
       <div className="boot-inner">
         <div className="boot-title">
-          RESOLUME · SHOW CONTROL <span>v0.1.0 · M2</span>
+          RESOLUME · SHOW CONTROL <span>v0.1.0 · M4</span>
         </div>
         {lines.map((l, i) => (
           <div className="boot-line" key={i} style={{ animationDelay: `${i * 160}ms` }}>
@@ -225,7 +306,7 @@ function StatusBar({
       <LiveTC getPos={getPos} />
       <span className="chip grow">LAST FIRED · {lastFired ?? '—'}</span>
       <span className="chip">{clock}</span>
-      <span className="chip ver">M2</span>
+      <span className="chip ver">M4</span>
     </footer>
   )
 }

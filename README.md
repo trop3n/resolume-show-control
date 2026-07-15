@@ -62,8 +62,12 @@ mode, Ctrl/⌘-K palette, AI timeline programmer, and multi-machine master/follo
 - **M2 ✅ — Timeline editor.** Multi-lane authoring (clip + column cues), drag-to-schedule,
   beat/bar snap, shared playhead ([`src/renderer/src/components/Timeline.tsx`](src/renderer/src/components/Timeline.tsx),
   [`src/renderer/src/show/`](src/renderer/src/show/)).
-- **M3** show engine (look-ahead scheduler fires the cues over OSC) → **M4** song bank +
-  persistence → **M5** aesthetic pass + polish → **M6 (optional)** Link / operator mode / AI programmer.
+- **M3 ✅ — Show engine.** Crossing-detection scheduler on the audio clock fires cues over OSC;
+  ARM/SAFE + PANIC/blackout; pure unit-tested core
+  ([`schedulerCore.ts`](src/renderer/src/show/schedulerCore.ts) · [`useShowEngine.ts`](src/renderer/src/show/useShowEngine.ts) · [`test/`](test/)).
+- **M4 ✅ — Song bank + persistence.** Save/load shows (cues + tempo + audio ref) to disk, library
+  UI, autosave ([`src/main/songbank.ts`](src/main/songbank.ts) · [`src/renderer/src/persist/`](src/renderer/src/persist/)).
+- **M5** aesthetic pass + polish → **M6 (optional)** Link / operator mode / AI programmer.
 
 ## M0: run the probe
 
@@ -107,18 +111,42 @@ elsewhere).
 - **transport**: play / pause (**Space**), stop-to-zero, sample-accurate playhead + timecode;
 - **BPM**: manual entry + **TAP** tempo, plus a beat **OFFSET** to line bar 1 up with the downbeat.
 
-**M2 — timeline editor** (author the show; nothing fires yet — that's M3)
+**M2 — timeline editor** (author the show)
 - a **lane per layer** (that has clips) plus a **COLUMNS** lane, sharing one time axis with the waveform;
 - **schedule a clip**: drag it from the grid onto its layer's lane — drops snap to the beat/bar grid;
 - **schedule a column**: double-click the COLUMNS lane; select the cue to step its column number;
 - **edit**: drag a cue to move it (snapped), click to select, **Del** to remove, **CLEAR** to wipe;
 - **SNAP** toggle: OFF / BEAT / BAR. Live playhead scrubs across ruler, waveform and lanes together.
 
-> ⚠️ **Clicking a clip changes live output.** The default host is a real in-use rig, so
-> only run this against a machine you're cleared to drive, or repoint the host first.
+**M3 — show engine** (the timeline now drives Resolume)
+- a **look-ahead-style scheduler** on the Web Audio clock: as the playhead crosses each cue it
+  fires the clip/column over OSC, on the beat, with a green flash on the cue;
+- **ARM / SAFE**: the engine starts **SAFE** — playback rehearses audio only and fires nothing until
+  you explicitly **ARM**. Manual clip-grid clicks are always live (an explicit operator action);
+- **PANIC**: stops the transport, disarms, and blackout (disconnect-all) — the halt+disarm is
+  guaranteed local; the blackout OSC is best-effort (verify the address on your Arena);
+- scrubbing/seeking never machine-guns skipped cues (a position jump rebaselines the scheduler);
+- the crossing logic is a pure, unit-tested core (`npm test` → 8 cases incl. the no-machine-gun guarantee).
 
-`npm run build` compiles all three bundles (main / preload / renderer); `npm start`
-runs the built app.
+**M4 — song bank + persistence** (a show survives a restart)
+- **BANK** drawer (in the transport bar): name the show, **SAVE** / **SAVE AS NEW** / **NEW**, and a
+  library of saved shows to **LOAD** (double-click) or delete;
+- shows persist as small JSON in Electron's userData dir — cues + BPM + beat offset + a *reference*
+  to the audio file (not the bytes), so the same audio can back many shows;
+- **OPEN** uses a native file dialog (captures the audio path); loading a show reloads its audio
+  from disk, or flags "audio missing — OPEN to relink" if the file moved;
+- **autosave** (debounced) once a show has been saved once; **Ctrl/⌘-S** saves; a dot marks unsaved edits.
+
+**Running a show (M3)**: load a song, set the BPM/offset, author cues on the timeline, then
+**ARM** and press play — cues fire on the beat. Leave it **SAFE** to rehearse audio only.
+**PANIC** stops + disarms + blackouts.
+
+> ⚠️ **Clicking a clip — and an ARMED playback — changes live output.** The default host is a
+> real in-use rig, so only run against a machine you're cleared to drive, or repoint the host.
+> The engine boots **SAFE**; nothing is fired by the timeline until you ARM.
+
+`npm run build` compiles all three bundles (main / preload / renderer); `npm test` runs the
+scheduler unit tests; `npm run typecheck` runs `tsc`.
 
 ## Reference
 

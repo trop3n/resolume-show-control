@@ -104,6 +104,16 @@ export class ResolumeClient extends EventEmitter {
     this.sendOsc(`/composition/columns/${column}/connect`, 1)
   }
 
+  /**
+   * Best-effort blackout for PANIC: disconnect every clip so the output goes black.
+   * The show engine's own halt+disarm is what actually guarantees no further cues
+   * fire; this just clears the wall. Verify this address on your Arena — a wrong
+   * address is a silent UDP no-op, in which case the wall holds its last frame.
+   */
+  disconnectAll(): void {
+    this.sendOsc('/composition/disconnectall', 1)
+  }
+
   // ---- WebSocket: live mirror ---------------------------------------------
   connectWs(): void {
     this.closedByUser = false

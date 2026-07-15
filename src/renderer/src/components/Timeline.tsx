@@ -21,7 +21,8 @@ export default function Timeline({
   getPos,
   onSeek,
   layers,
-  show
+  show,
+  firedIds
 }: {
   buffer: AudioBuffer | null
   duration: number
@@ -31,6 +32,7 @@ export default function Timeline({
   onSeek: (t: number) => void
   layers: LayerModel[]
   show: ShowApi
+  firedIds: Set<string>
 }): JSX.Element {
   const [snap, setSnap] = useState<SnapRes>('beat')
   const snapArgs: SnapArgs = { res: snap, bpm, beatOffset, duration }
@@ -180,7 +182,13 @@ export default function Timeline({
               {show.triggers
                 .filter((t): t is Trigger => t.kind === 'clip' && t.layer === layer.index)
                 .map((t) => (
-                  <TriggerChip key={t.id} trig={t} show={show} snapArgs={snapArgs} />
+                  <TriggerChip
+                    key={t.id}
+                    trig={t}
+                    show={show}
+                    snapArgs={snapArgs}
+                    fired={firedIds.has(t.id)}
+                  />
                 ))}
             </div>
           </div>
@@ -210,7 +218,14 @@ export default function Timeline({
             {show.triggers
               .filter((t): t is Trigger => t.kind === 'column')
               .map((t) => (
-                <TriggerChip key={t.id} trig={t} show={show} snapArgs={snapArgs} editableColumn />
+                <TriggerChip
+                  key={t.id}
+                  trig={t}
+                  show={show}
+                  snapArgs={snapArgs}
+                  fired={firedIds.has(t.id)}
+                  editableColumn
+                />
               ))}
           </div>
         </div>
@@ -227,11 +242,13 @@ function TriggerChip({
   trig,
   show,
   snapArgs,
+  fired,
   editableColumn
 }: {
   trig: Trigger
   show: ShowApi
   snapArgs: SnapArgs
+  fired?: boolean
   editableColumn?: boolean
 }): JSX.Element {
   const ref = useRef<HTMLDivElement>(null)
@@ -243,7 +260,7 @@ function TriggerChip({
   return (
     <div
       ref={ref}
-      className={`trig ${trig.kind} ${selected ? 'sel' : ''}`}
+      className={`trig ${trig.kind} ${selected ? 'sel' : ''} ${fired ? 'fired' : ''}`}
       style={{ left: `${left}%` }}
       title={label}
       onClick={(e) => {

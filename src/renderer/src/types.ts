@@ -20,6 +20,7 @@ export interface ResolumeApi {
   getComposition: () => Promise<CompositionModel | null>
   fireClip: (layer: number, clip: number) => Promise<boolean>
   fireColumn: (column: number) => Promise<boolean>
+  disconnectAll: () => Promise<boolean>
   onState: (cb: (m: CompositionModel) => void) => () => void
   onStatus: (cb: (s: { connected: boolean }) => void) => () => void
 }

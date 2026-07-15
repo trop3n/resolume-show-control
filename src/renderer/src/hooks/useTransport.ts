@@ -10,10 +10,13 @@ export interface TransportApi {
   bpm: number
   beatOffset: number
   position: () => number
+  getEpoch: () => number
   setBpm: (n: number) => void
   setBeatOffset: (n: number) => void
   tap: () => void
   loadFile: (file: File) => Promise<void>
+  loadData: (data: ArrayBuffer, name: string) => Promise<void>
+  unload: () => void
   play: () => void
   pause: () => void
   toggle: () => void
@@ -33,11 +36,23 @@ export function useTransport(): TransportApi {
   const [bpm, setBpm] = useState(120)
   const [beatOffset, setBeatOffset] = useState(0)
 
-  const loadFile = useCallback(async (file: File) => {
-    const data = await file.arrayBuffer()
+  const loadData = useCallback(async (data: ArrayBuffer, name: string) => {
     const buf = await engine.load(data)
     setBuffer(buf)
-    setSongName(file.name)
+    setSongName(name)
+  }, [])
+
+  const loadFile = useCallback(
+    async (file: File) => {
+      await loadData(await file.arrayBuffer(), file.name)
+    },
+    [loadData]
+  )
+
+  const unload = useCallback(() => {
+    engine.unload()
+    setBuffer(null)
+    setSongName(null)
   }, [])
 
   const taps = useRef<number[]>([])
@@ -57,6 +72,7 @@ export function useTransport(): TransportApi {
   }, [])
 
   const position = useCallback(() => engine.position(), [])
+  const getEpoch = useCallback(() => engine.epoch, [])
   const play = useCallback(() => engine.play(), [])
   const pause = useCallback(() => engine.pause(), [])
   const toggle = useCallback(() => engine.toggle(), [])
@@ -72,10 +88,13 @@ export function useTransport(): TransportApi {
     bpm,
     beatOffset,
     position,
+    getEpoch,
     setBpm,
     setBeatOffset,
     tap,
     loadFile,
+    loadData,
+    unload,
     play,
     pause,
     toggle,

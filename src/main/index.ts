@@ -1,6 +1,15 @@
 import { join } from 'node:path'
 import { app, BrowserWindow, ipcMain, shell } from 'electron'
 import { ResolumeClient } from './resolume-client'
+import {
+  listSongs,
+  saveSong,
+  loadSong,
+  deleteSong,
+  readAudio,
+  openAudioDialog,
+  type SavedShow
+} from './songbank'
 
 let win: BrowserWindow | null = null
 let client: ResolumeClient | null = null
@@ -56,6 +65,18 @@ app.whenReady().then(() => {
     client?.fireColumn(column)
     return true
   })
+  ipcMain.handle('resolume:disconnectAll', async () => {
+    client?.disconnectAll()
+    return true
+  })
+
+  // Song bank + audio persistence
+  ipcMain.handle('bank:list', async () => listSongs())
+  ipcMain.handle('bank:save', async (_e, show: SavedShow, id?: string) => saveSong(show, id))
+  ipcMain.handle('bank:load', async (_e, id: string) => loadSong(id))
+  ipcMain.handle('bank:delete', async (_e, id: string) => deleteSong(id))
+  ipcMain.handle('bank:readAudio', async (_e, path: string) => readAudio(path))
+  ipcMain.handle('bank:openAudio', async () => openAudioDialog(win))
 
   createWindow()
   app.on('activate', () => {

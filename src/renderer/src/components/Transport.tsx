@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
 import type { TransportApi } from '../hooks/useTransport'
 
 export function fmtTime(sec: number): string {
@@ -34,17 +34,29 @@ function TimeReadout({ getPos, duration }: { getPos: () => number; duration: num
   )
 }
 
-export default function Transport({ t }: { t: TransportApi }): JSX.Element {
-  const fileRef = useRef<HTMLInputElement>(null)
+export default function Transport({
+  t,
+  showName,
+  dirty,
+  onOpenAudio,
+  onDropFile,
+  onOpenBank
+}: {
+  t: TransportApi
+  showName: string
+  dirty: boolean
+  onOpenAudio: () => Promise<void>
+  onDropFile: (file: File) => Promise<void>
+  onOpenBank: () => void
+}): JSX.Element {
   const [loadErr, setLoadErr] = useState<string | null>(null)
   const [dragging, setDragging] = useState(false)
   const playing = t.state === 'playing'
 
-  const open = async (file: File | undefined): Promise<void> => {
-    if (!file) return
+  const guard = async (fn: () => Promise<void>): Promise<void> => {
     setLoadErr(null)
     try {
-      await t.loadFile(file)
+      await fn()
     } catch (e) {
       setLoadErr(e instanceof Error ? e.message : 'decode failed')
     }
@@ -61,20 +73,14 @@ export default function Transport({ t }: { t: TransportApi }): JSX.Element {
       onDrop={(e) => {
         e.preventDefault()
         setDragging(false)
-        void open(e.dataTransfer.files[0])
+        const file = e.dataTransfer.files[0]
+        if (file) void guard(() => onDropFile(file))
       }}
     >
       <div className="transport-controls">
-        <button className="tbtn" title="Open song" onClick={() => fileRef.current?.click()}>
+        <button className="tbtn" title="Open audio file" onClick={() => void guard(onOpenAudio)}>
           OPEN
         </button>
-        <input
-          ref={fileRef}
-          type="file"
-          accept="audio/*"
-          hidden
-          onChange={(e) => void open(e.target.files?.[0])}
-        />
         <button
           className="tbtn stop"
           title="Stop (return to zero)"
@@ -131,8 +137,18 @@ export default function Transport({ t }: { t: TransportApi }): JSX.Element {
         </div>
 
         <div className="songname" title={t.songName ?? ''}>
-          {loadErr ? <span className="songerr">load error: {loadErr}</span> : t.songName ?? 'no song loaded — OPEN or drop an audio file'}
+          {loadErr ? (
+            <span className="songerr">load error: {loadErr}</span>
+          ) : (
+            t.songName ?? 'no audio — OPEN or drop a file'
+          )}
         </div>
+
+        <button className="bank-btn" onClick={onOpenBank} title="Song bank (save / load shows)">
+          {dirty && <span className="bank-dot" />}
+          <span className="bank-btn-name">{showName || 'untitled show'}</span>
+          <span className="bank-btn-tag">BANK</span>
+        </button>
       </div>
     </section>
   )

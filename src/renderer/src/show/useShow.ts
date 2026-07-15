@@ -12,6 +12,7 @@ export interface ShowApi {
   selectedId: string | null
   addClip: (layer: number, clip: number, time: number, label: string) => void
   addColumn: (time: number, column?: number) => void
+  loadTriggers: (triggers: Trigger[]) => void
   move: (id: string, time: number) => void
   setColumn: (id: string, column: number) => void
   remove: (id: string) => void
@@ -33,6 +34,11 @@ export function useShow(): ShowApi {
     const t: Trigger = { id: uid(), kind: 'column', time, column, label: `Col ${column}` }
     setTriggers((xs) => [...xs, t])
     setSelectedId(t.id)
+  }, [])
+
+  const loadTriggers = useCallback((next: Trigger[]) => {
+    setTriggers(next)
+    setSelectedId(null)
   }, [])
 
   const move = useCallback((id: string, time: number) => {
@@ -61,7 +67,18 @@ export function useShow(): ShowApi {
   // Stable identity except when the show data itself changes, so consumers' effects
   // (e.g. the timeline's Delete-key handler) don't re-bind on unrelated re-renders.
   return useMemo(
-    () => ({ triggers, selectedId, addClip, addColumn, move, setColumn, remove, select, clear }),
-    [triggers, selectedId, addClip, addColumn, move, setColumn, remove, select, clear]
+    () => ({
+      triggers,
+      selectedId,
+      addClip,
+      addColumn,
+      loadTriggers,
+      move,
+      setColumn,
+      remove,
+      select,
+      clear
+    }),
+    [triggers, selectedId, addClip, addColumn, loadTriggers, move, setColumn, remove, select, clear]
   )
 }

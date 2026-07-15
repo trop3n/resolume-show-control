@@ -19,6 +19,7 @@ class AudioEngine {
   private startOffset = 0 // buffer offset (s) at that moment; == position while stopped
   private _state: TransportState = 'stopped'
   private stoppingManually = false // lets onended tell manual stop from natural end
+  private _epoch = 0 // bumped on any position discontinuity (seek/stop/load)
 
   private listeners = new Set<Listener>()
 
@@ -58,6 +59,11 @@ class AudioEngine {
   get context(): AudioContext | null {
     return this.ctx
   }
+  /** Increments whenever the playhead jumps (seek/stop/load). The scheduler watches
+   *  this to rebaseline instead of firing every cue it "crossed" during a jump. */
+  get epoch(): number {
+    return this._epoch
+  }
 
   async load(data: ArrayBuffer): Promise<AudioBuffer> {
     const ctx = this.ensure()
@@ -66,8 +72,19 @@ class AudioEngine {
     this.buffer = buf
     this.startOffset = 0
     this._state = 'stopped'
+    this._epoch++
     this.emit()
     return buf
+  }
+
+  /** Clear the loaded song entirely (used by "new show"). */
+  unload(): void {
+    this.hardStop()
+    this.buffer = null
+    this.startOffset = 0
+    this._state = 'stopped'
+    this._epoch++
+    this.emit()
   }
 
   /** Current playback position in seconds — read this imperatively from a rAF loop. */
@@ -142,6 +159,7 @@ class AudioEngine {
     this.hardStop()
     this.startOffset = 0
     this._state = 'stopped'
+    this._epoch++
     this.emit()
   }
 
@@ -155,6 +173,7 @@ class AudioEngine {
     } else {
       this.startOffset = c
     }
+    this._epoch++
   }
 }
 
