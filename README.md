@@ -67,7 +67,11 @@ mode, Ctrl/⌘-K palette, AI timeline programmer, and multi-machine master/follo
   ([`schedulerCore.ts`](src/renderer/src/show/schedulerCore.ts) · [`useShowEngine.ts`](src/renderer/src/show/useShowEngine.ts) · [`test/`](test/)).
 - **M4 ✅ — Song bank + persistence.** Save/load shows (cues + tempo + audio ref) to disk, library
   UI, autosave ([`src/main/songbank.ts`](src/main/songbank.ts) · [`src/renderer/src/persist/`](src/renderer/src/persist/)).
-- **M5** aesthetic pass + polish → **M6 (optional)** Link / operator mode / AI programmer.
+- **M5 ✅ — Polish.** Timeline zoom + unified beat grid, auto-follow playhead, keyboard cue nudge,
+  and a full visual-finish pass. Plus a browser preview (`npm run web`) for design iteration.
+- **M6 ✅ (operator mode) — Fullscreen live view.** Big next-cue countdown, progress + cue ticks,
+  master transport/ARM/PANIC, red armed state ([`src/renderer/src/components/OperatorView.tsx`](src/renderer/src/components/OperatorView.tsx)).
+  Remaining M6 stretch (not built): Ableton Link, AI timeline programmer.
 
 ## M0: run the probe
 

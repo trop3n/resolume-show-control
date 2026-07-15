@@ -10,6 +10,7 @@ import ShowBar from './components/ShowBar'
 import Timeline from './components/Timeline'
 import ClipGrid from './components/ClipGrid'
 import SongBank from './components/SongBank'
+import OperatorView from './components/OperatorView'
 
 const DEFAULT_HOST = '172.16.8.27'
 
@@ -23,6 +24,7 @@ export default function App(): JSX.Element {
   const [armed, setArmed] = useState(false)
   const [firedIds, setFiredIds] = useState<Set<string>>(() => new Set())
   const [bankOpen, setBankOpen] = useState(false)
+  const [operator, setOperator] = useState(false)
 
   const t = useTransport()
   const show = useShow()
@@ -182,6 +184,7 @@ export default function App(): JSX.Element {
         getPos={t.position}
         onToggleArm={() => setArmed((a) => !a)}
         onPanic={panic}
+        onOperator={() => setOperator(true)}
       />
 
       <Timeline
@@ -217,6 +220,20 @@ export default function App(): JSX.Element {
       />
 
       <SongBank bank={bank} open={bankOpen} onClose={() => setBankOpen(false)} />
+
+      {operator && (
+        <OperatorView
+          t={t}
+          show={show}
+          armed={armed}
+          live={armed && t.state === 'playing'}
+          connected={connected}
+          lastFired={lastFired}
+          onToggleArm={() => setArmed((a) => !a)}
+          onPanic={panic}
+          onExit={() => setOperator(false)}
+        />
+      )}
     </div>
   )
 }
@@ -237,7 +254,7 @@ function BootSplash({ host }: { host: string }): JSX.Element {
     <div className="boot">
       <div className="boot-inner">
         <div className="boot-title">
-          RESOLUME · SHOW CONTROL <span>v0.1.0 · M5</span>
+          RESOLUME · SHOW CONTROL <span>v0.1.0 · M6</span>
         </div>
         {lines.map((l, i) => (
           <div className="boot-line" key={i} style={{ animationDelay: `${i * 160}ms` }}>
@@ -310,7 +327,7 @@ function StatusBar({
       <LiveTC getPos={getPos} />
       <span className="chip grow">LAST FIRED · {lastFired ?? '—'}</span>
       <span className="chip">{clock}</span>
-      <span className="chip ver">M5</span>
+      <span className="chip ver">M6</span>
     </footer>
   )
 }

@@ -42,7 +42,8 @@ export default function ShowBar({
   triggers,
   getPos,
   onToggleArm,
-  onPanic
+  onPanic,
+  onOperator
 }: {
   armed: boolean
   live: boolean
@@ -51,6 +52,7 @@ export default function ShowBar({
   getPos: () => number
   onToggleArm: () => void
   onPanic: () => void
+  onOperator: () => void
 }): JSX.Element {
   return (
     <section className={`showbar ${armed ? 'armed' : ''} ${live ? 'live' : ''}`}>
@@ -61,6 +63,9 @@ export default function ShowBar({
       </span>
       {armed && !connected && <span className="sb-warn">no link — cues won't reach Arena</span>}
       <NextCue triggers={triggers} getPos={getPos} />
+      <button className="sb-op" onClick={onOperator} title="Fullscreen operator mode">
+        OPERATOR
+      </button>
       <button
         className={`sb-arm ${armed ? 'on' : ''}`}
         onClick={onToggleArm}
