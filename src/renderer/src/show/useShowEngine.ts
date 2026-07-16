@@ -10,6 +10,8 @@ export interface ShowEngineOpts {
   triggers: Trigger[]
   isPlaying: boolean
   armed: boolean
+  /** Fire cues this many ms early (compensates for output latency). */
+  latencyMs: number
   position: () => number
   getEpoch: () => number
   dispatch: (t: Trigger) => void
@@ -31,6 +33,7 @@ export function useShowEngine({
   triggers,
   isPlaying,
   armed,
+  latencyMs,
   position,
   getEpoch,
   dispatch
@@ -43,20 +46,20 @@ export function useShowEngine({
   epochRef.current = getEpoch
   const dispatchRef = useRef(dispatch)
   dispatchRef.current = dispatch
+  const latencyRef = useRef(latencyMs)
+  latencyRef.current = latencyMs
 
   const active = isPlaying && armed
 
   useEffect(() => {
     if (!active) return
-    let state: SchedState = { lastPos: positionRef.current(), lastEpoch: epochRef.current() }
+    // The scheduler works in "adjusted" time: playhead + latency, so crossings (and
+    // thus fires) happen `latencyMs` early. Baseline must be adjusted too.
+    const adjPos = (): number => positionRef.current() + latencyRef.current / 1000
+    let state: SchedState = { lastPos: adjPos(), lastEpoch: epochRef.current() }
 
     const id = window.setInterval(() => {
-      const { fire, next } = schedulerStep(
-        state,
-        positionRef.current(),
-        epochRef.current(),
-        triggersRef.current
-      )
+      const { fire, next } = schedulerStep(state, adjPos(), epochRef.current(), triggersRef.current)
       for (const t of fire) dispatchRef.current(t)
       state = next
     }, TICK_MS)

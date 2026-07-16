@@ -92,6 +92,8 @@ export class ResolumeClient extends EventEmitter {
   }
 
   private sendOsc(address: string, arg = 1, type: 'i' | 'f' = 'i'): void {
+    // eslint-disable-next-line no-console
+    console.log(`[osc→${this.host}:${this.oscPort}] ${address} ${arg}`)
     this.osc.send(this.encodeOsc(address, arg, type), this.oscPort, this.host)
   }
 

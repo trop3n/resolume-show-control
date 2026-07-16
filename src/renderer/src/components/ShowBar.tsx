@@ -43,7 +43,9 @@ export default function ShowBar({
   getPos,
   onToggleArm,
   onPanic,
-  onOperator
+  onOperator,
+  latencyMs,
+  onLatency
 }: {
   armed: boolean
   live: boolean
@@ -53,6 +55,8 @@ export default function ShowBar({
   onToggleArm: () => void
   onPanic: () => void
   onOperator: () => void
+  latencyMs: number
+  onLatency: (ms: number) => void
 }): JSX.Element {
   return (
     <section className={`showbar ${armed ? 'armed' : ''} ${live ? 'live' : ''}`}>
@@ -62,6 +66,20 @@ export default function ShowBar({
         {armed ? (live ? 'LIVE · FIRING' : 'ARMED') : 'SAFE'}
       </span>
       {armed && !connected && <span className="sb-warn">no link — cues won't reach Arena</span>}
+      <span className="sb-lat" title="Fire all cues this many ms early to compensate for output latency">
+        LAT
+        <input
+          className="sb-lat-num"
+          type="number"
+          step={5}
+          value={latencyMs}
+          onChange={(e) => {
+            const v = parseFloat(e.target.value)
+            if (!isNaN(v)) onLatency(v)
+          }}
+        />
+        ms
+      </span>
       <NextCue triggers={triggers} getPos={getPos} />
       <button className="sb-op" onClick={onOperator} title="Fullscreen operator mode">
         OPERATOR

@@ -362,6 +362,32 @@ body::before {
   color: var(--warn);
   font-size: 10px;
 }
+.sb-lat {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--muted);
+  font-size: 9px;
+  letter-spacing: 1.5px;
+}
+.sb-lat-num {
+  width: 54px;
+  height: 26px;
+  background: #05070a;
+  border: 1px solid var(--line);
+  color: var(--text);
+  font-family: var(--mono);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  padding: 0 6px;
+  border-radius: var(--r-sm);
+}
+.sb-lat-num:focus {
+  outline: none;
+  border-color: var(--accent-dim);
+  box-shadow: 0 0 0 2px var(--accent-soft);
+}
 .next-cue {
   flex: 1;
   color: var(--muted);

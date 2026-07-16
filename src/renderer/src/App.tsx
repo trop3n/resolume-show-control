@@ -25,6 +25,21 @@ export default function App(): JSX.Element {
   const [firedIds, setFiredIds] = useState<Set<string>>(() => new Set())
   const [bankOpen, setBankOpen] = useState(false)
   const [operator, setOperator] = useState(false)
+  // Fire all cues this many ms early to compensate for output latency. Persisted per
+  // install (a rig property, not per-show); positive = fire earlier.
+  const [latencyMs, setLatencyMs] = useState<number>(() => {
+    const v = Number(localStorage.getItem('rsc.latencyMs'))
+    return Number.isFinite(v) ? v : 0
+  })
+  const changeLatency = useCallback((ms: number) => {
+    const v = Math.max(-500, Math.min(1000, Math.round(ms)))
+    setLatencyMs(v)
+    try {
+      localStorage.setItem('rsc.latencyMs', String(v))
+    } catch {
+      /* ignore */
+    }
+  }, [])
 
   const t = useTransport()
   const show = useShow()
@@ -90,6 +105,7 @@ export default function App(): JSX.Element {
   // Manual fire from the clip grid — always live: it's an explicit operator action,
   // not gated by ARM (ARM only gates the automated timeline).
   const fire = useCallback(async (layer: number, clip: number, name: string) => {
+    console.log(`[fire] manual → L${layer}/${clip} "${name}"`)
     await window.api.fireClip(layer, clip)
     setLastFired(`L${layer}·${clip} ${name}`.trim())
   }, [])
@@ -98,9 +114,11 @@ export default function App(): JSX.Element {
   const dispatch = useCallback(
     (trig: Trigger) => {
       if (trig.kind === 'clip') {
+        console.log(`[fire] cue → L${trig.layer}/${trig.clip} "${trig.label}" @ ${trig.time.toFixed(2)}s`)
         window.api.fireClip(trig.layer, trig.clip)
         setLastFired(`▸ L${trig.layer}·${trig.clip} ${trig.label}`.trim())
       } else {
+        console.log(`[fire] cue → column ${trig.column} @ ${trig.time.toFixed(2)}s`)
         window.api.fireColumn(trig.column)
         setLastFired(`▸ COL ${trig.column}`)
       }
@@ -113,6 +131,7 @@ export default function App(): JSX.Element {
     triggers: show.triggers,
     isPlaying: t.state === 'playing',
     armed,
+    latencyMs,
     position: t.position,
     getEpoch: t.getEpoch,
     dispatch
@@ -185,6 +204,8 @@ export default function App(): JSX.Element {
         onToggleArm={() => setArmed((a) => !a)}
         onPanic={panic}
         onOperator={() => setOperator(true)}
+        latencyMs={latencyMs}
+        onLatency={changeLatency}
       />
 
       <Timeline
