@@ -106,9 +106,13 @@ export default function App(): JSX.Element {
   // not gated by ARM (ARM only gates the automated timeline).
   const fire = useCallback(async (layer: number, clip: number, name: string) => {
     console.log(`[fire] manual → L${layer}/${clip} "${name}"`)
+    if (!connected) {
+      setLastFired(`L${layer}·${clip} ${name} (no link)`.trim())
+      return
+    }
     await window.api.fireClip(layer, clip)
     setLastFired(`L${layer}·${clip} ${name}`.trim())
-  }, [])
+  }, [connected])
 
   // Automated dispatch from the show engine.
   const dispatch = useCallback(
@@ -137,14 +141,18 @@ export default function App(): JSX.Element {
     dispatch
   })
 
-  // PANIC: halt the transport + disarm (guarantees no further cue fires), then a
-  // best-effort blackout of the wall.
+  // PANIC: the local halt (stop + disarm) is the guaranteed part — always run it.
+  // The OSC blackout only matters when there's a link; report honestly either way.
   const panic = useCallback(() => {
     t.stop()
     setArmed(false)
-    window.api.disconnectAll()
-    setLastFired('■ PANIC · disconnect all')
-  }, [t])
+    if (connected) {
+      window.api.disconnectAll()
+      setLastFired('■ PANIC · halt + blackout')
+    } else {
+      setLastFired('■ PANIC · halt (no link)')
+    }
+  }, [t, connected])
 
   const totals = useMemo(() => {
     if (!comp) return { layers: 0, clips: 0 }
