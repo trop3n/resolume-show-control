@@ -388,6 +388,9 @@ function TriggerChip({
         moving.current = false
         ref.current?.releasePointerCapture(e.pointerId)
       }}
+      onPointerCancel={() => {
+        moving.current = false
+      }}
     >
       <span className="trig-tick" />
       <span className="trig-label">{label}</span>

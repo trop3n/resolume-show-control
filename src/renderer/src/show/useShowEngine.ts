@@ -65,5 +65,5 @@ export function useShowEngine({
     }, TICK_MS)
 
     return () => window.clearInterval(id)
-  }, [active])
+  }, [active, latencyMs])
 }
