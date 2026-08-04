@@ -15,6 +15,7 @@
  * Usage:
  *   node resolume-probe.mjs                 # discover + print the clip grid
  *   node resolume-probe.mjs fire <L> <C>    # fire clip at layer L, clip C (1-based)
+ *   node resolume-probe.mjs fire-column <N> # fire column N (1-based) — verify on your rig
  *
  * Override targets with env vars if Resolume is on another machine/port:
  *   RESOLUME_HOST=192.168.1.20 RESOLUME_REST_PORT=8080 RESOLUME_OSC_PORT=7000 \
@@ -81,6 +82,17 @@ function fireClip(layer, clip) {
   })
 }
 
+function fireColumn(column) {
+  return new Promise((resolve, reject) => {
+    const client = new Client(HOST, OSC_PORT)
+    const address = `/composition/columns/${column}/connect`
+    client.send(new Message(address, 1), (err) => {
+      client.close()
+      err ? reject(err) : resolve(address)
+    })
+  })
+}
+
 // Best-effort read-back so the probe can confirm the trigger landed without you
 // having to watch the Resolume window. Non-fatal if the clip endpoint shape differs.
 async function readBackClip(layer, clip) {
@@ -89,6 +101,19 @@ async function readBackClip(layer, clip) {
     if (!res.ok) return null
     const c = await res.json()
     return val(c.connected, '(unknown)')
+  } catch {
+    return null
+  }
+}
+
+// Column "selected" field name has shifted across Arena builds, so we don't guess —
+// we dump the raw JSON so the operator can see exactly what their rig returns. This
+// is the verification step: if the column went live, the response will show it.
+async function readBackColumn(column) {
+  try {
+    const res = await fetch(`${BASE}/composition/columns/${column}`)
+    if (!res.ok) return null
+    return await res.json()
   } catch {
     return null
   }
@@ -112,6 +137,21 @@ try {
     } else {
       console.log('Watch Resolume — the clip should now be connected.')
     }
+  } else if (cmd === 'fire-column') {
+    const column = Number(aRaw)
+    if (!column) {
+      throw new Error('Usage: node resolume-probe.mjs fire-column <column>  (1-based)')
+    }
+    const address = await fireColumn(column)
+    console.log(`OSC → ${HOST}:${OSC_PORT}   ${address}   (value 1)`)
+    await new Promise((r) => setTimeout(r, 250))
+    const raw = await readBackColumn(column)
+    if (raw) {
+      console.log(`REST read-back: column ${column} →`, JSON.stringify(raw))
+    } else {
+      console.log('No REST read-back (column endpoint missing or shape differs).')
+    }
+    console.log('Watch Resolume — the column should now be active.')
   } else {
     console.log(`REST ← ${BASE}/composition`)
     printGrid(await getComposition())

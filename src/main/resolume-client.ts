@@ -25,9 +25,14 @@ const val = (p: unknown, fallback?: unknown): unknown =>
   p && typeof p === 'object' && 'value' in (p as object) ? (p as { value: unknown }).value : fallback
 
 /**
- * All Resolume I/O for one Arena machine. Verified against Arena 7.8+:
- *   REST : http://<host>:8080/api/v1
- *   OSC  : <host>:7000  /composition/layers/L/clips/C/connect  (int 1 = fire)
+ * All Resolume I/O for one Arena machine. Verification status:
+ *   REST : http://<host>:8080/api/v1          — probe-verified (M0)
+ *   OSC  : <host>:7000
+ *     /composition/layers/L/clips/C/connect   — probe-verified (M0)
+ *     /composition/columns/C/connect          — matches the documented addressing
+ *                                                scheme; NOT probe-verified. Confirm
+ *                                                on your rig:
+ *                                                node probe/resolume-probe.mjs fire-column 1
  *   WS   : ws://<host>:8080/api/v1  → full-composition JSON snapshots on change
  */
 export class ResolumeClient extends EventEmitter {
@@ -101,7 +106,9 @@ export class ResolumeClient extends EventEmitter {
     this.sendOsc(`/composition/layers/${layer}/clips/${clip}/connect`, 1)
   }
 
-  // Same verified /connect scheme; column addressing to confirm on your setup.
+  // Column trigger follows the same /connect scheme as clips; the address itself isn't
+  // probe-verified, so a wrong address is a silent UDP no-op (the wall holds its last
+  // frame). Run `node probe/resolume-probe.mjs fire-column N` to confirm before a show.
   fireColumn(column: number): void {
     this.sendOsc(`/composition/columns/${column}/connect`, 1)
   }
