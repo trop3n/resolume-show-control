@@ -6,3 +6,11 @@ out/
 .DS_Store
 .env
 .env.local
+
+# AI assistant instruction files (local context, not part of the project)
+AGENTS.md
+CLAUDE.md
+.cursorrules
+.cursor/
+.github/copilot-instructions.md
+.opencode/

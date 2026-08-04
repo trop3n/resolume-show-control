@@ -26,7 +26,8 @@ function createWindow(): void {
     title: 'Resolume Show Control',
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),
-      sandbox: false
+      sandbox: true,
+      contextIsolation: true
     }
   })
 
