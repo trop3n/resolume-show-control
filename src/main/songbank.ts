@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import { readFile, writeFile, readdir, unlink, mkdir } from 'node:fs/promises'
-import { basename, join } from 'node:path'
+import { basename, extname, join } from 'node:path'
 import { app, dialog, type BrowserWindow } from 'electron'
 
 // A persisted show: cues + tempo + a *reference* to the audio file on disk (not the audio
@@ -31,6 +31,44 @@ export interface AudioPayload {
 }
 
 const AUDIO_EXT = ['wav', 'aif', 'aiff', 'flac', 'mp3', 'm4a', 'aac', 'ogg', 'opus']
+
+// Boundary validation for show files loaded from disk. We keep `cues` opaque to main
+// elsewhere (it's the renderer's schema), but at the load boundary we structurally check
+// each cue so a malformed or future-schema file can't reach the engine and crash dispatch.
+function isValidCue(x: unknown): boolean {
+  if (!x || typeof x !== 'object') return false
+  const t = x as Record<string, unknown>
+  if (typeof t.id !== 'string' || typeof t.time !== 'number' || !Number.isFinite(t.time)) return false
+  if (t.kind === 'clip') {
+    return (
+      typeof t.layer === 'number' &&
+      typeof t.clip === 'number' &&
+      typeof t.label === 'string'
+    )
+  }
+  if (t.kind === 'column') {
+    return typeof t.column === 'number' && typeof t.label === 'string'
+  }
+  return false
+}
+
+function isValidShow(x: unknown): x is SavedShow {
+  if (!x || typeof x !== 'object') return false
+  const s = x as Record<string, unknown>
+  return (
+    s.version === 1 &&
+    typeof s.name === 'string' &&
+    (s.audioPath === null || typeof s.audioPath === 'string') &&
+    (s.audioName === null || typeof s.audioName === 'string') &&
+    typeof s.bpm === 'number' &&
+    Number.isFinite(s.bpm) &&
+    typeof s.beatOffset === 'number' &&
+    Number.isFinite(s.beatOffset) &&
+    Array.isArray(s.cues) &&
+    (s.cues as unknown[]).every(isValidCue) &&
+    typeof s.savedAt === 'string'
+  )
+}
 
 function bankDir(): string {
   return join(app.getPath('userData'), 'songbank')
@@ -80,7 +118,12 @@ export async function saveSong(show: SavedShow, id?: string): Promise<{ id: stri
 export async function loadSong(id: string): Promise<SavedShow | null> {
   if (!/^[a-f0-9-]+$/i.test(id)) return null
   try {
-    return JSON.parse(await readFile(join(bankDir(), `${id}.json`), 'utf8')) as SavedShow
+    const parsed: unknown = JSON.parse(await readFile(join(bankDir(), `${id}.json`), 'utf8'))
+    if (!isValidShow(parsed)) {
+      console.warn(`[songbank] ${id}.json failed schema validation — refusing`)
+      return null
+    }
+    return parsed
   } catch {
     return null
   }
@@ -97,6 +140,8 @@ export async function deleteSong(id: string): Promise<boolean> {
 }
 
 export async function readAudio(path: string): Promise<AudioPayload | null> {
+  const ext = extname(path).toLowerCase().replace(/^\./, '')
+  if (!AUDIO_EXT.includes(ext)) return null
   try {
     const buf = await readFile(path)
     return { name: basename(path), data: toArrayBuffer(buf) }
