@@ -1,5 +1,5 @@
 import { join } from 'node:path'
-import { app, BrowserWindow, ipcMain, shell } from 'electron'
+import { app, BrowserWindow, ipcMain, session, shell } from 'electron'
 import { ResolumeClient } from './resolume-client'
 import {
   listSongs,
@@ -52,6 +52,33 @@ function wireResolume(host: string): ResolumeClient {
 }
 
 app.whenReady().then(() => {
+  // Strict CSP for the renderer. Skipped in dev because electron-vite injects inline
+  // scripts + eval for HMR — only enforced in the packaged app. The renderer makes no
+  // direct network calls (all Resolume I/O is here in main), so connect-src stays at
+  // 'self'; the only outbound renderer traffic is <img> thumbnails from the rig.
+  if (app.isPackaged) {
+    session.defaultSession.webRequest.onHeadersReceived((details, callback) => {
+      callback({
+        responseHeaders: {
+          ...details.responseHeaders,
+          'Content-Security-Policy': [
+            [
+              "default-src 'self'",
+              "script-src 'self'",
+              "style-src 'self' 'unsafe-inline'",
+              "img-src 'self' data: http://*:8080",
+              "connect-src 'self'",
+              "font-src 'self'",
+              "object-src 'none'",
+              "base-uri 'self'",
+              "form-action 'none'"
+            ].join('; ')
+          ]
+        }
+      })
+    })
+  }
+
   // Connect: start the live mirror, and return a reliable REST snapshot for first paint.
   ipcMain.handle('resolume:connect', async (_e, host: string) => {
     const c = wireResolume(host)
