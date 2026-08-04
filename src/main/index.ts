@@ -33,7 +33,15 @@ function createWindow(): void {
 
   win.on('ready-to-show', () => win?.show())
   win.webContents.setWindowOpenHandler(({ url }) => {
-    shell.openExternal(url)
+    // Only http(s) may be handed to the OS handler. Anything else (file:, javascript:,
+    // custom schemes) is silently dropped — never passed to shell.openExternal, which
+    // would otherwise launch arbitrary handlers.
+    try {
+      const { protocol } = new URL(url)
+      if (protocol === 'http:' || protocol === 'https:') void shell.openExternal(url)
+    } catch {
+      /* malformed URL — ignore */
+    }
     return { action: 'deny' }
   })
 
