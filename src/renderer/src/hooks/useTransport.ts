@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useReducer, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'react'
 import { engine, type TransportState } from '../audio/engine'
 
 export interface TransportApi {
@@ -79,26 +79,47 @@ export function useTransport(): TransportApi {
   const stop = useCallback(() => engine.stop(), [])
   const seek = useCallback((t: number) => engine.seek(t), [])
 
-  return {
-    state: engine.state,
-    hasSong: engine.hasSong,
-    duration: engine.duration,
-    buffer,
-    songName,
-    bpm,
-    beatOffset,
-    position,
-    getEpoch,
-    setBpm,
-    setBeatOffset,
-    tap,
-    loadFile,
-    loadData,
-    unload,
-    play,
-    pause,
-    toggle,
-    stop,
-    seek
-  }
+  return useMemo<TransportApi>(
+    () => ({
+      state: engine.state,
+      hasSong: engine.hasSong,
+      duration: engine.duration,
+      buffer,
+      songName,
+      bpm,
+      beatOffset,
+      position,
+      getEpoch,
+      setBpm,
+      setBeatOffset,
+      tap,
+      loadFile,
+      loadData,
+      unload,
+      play,
+      pause,
+      toggle,
+      stop,
+      seek
+    }),
+    [
+      buffer,
+      songName,
+      bpm,
+      beatOffset,
+      position,
+      getEpoch,
+      setBpm,
+      setBeatOffset,
+      tap,
+      loadFile,
+      loadData,
+      unload,
+      play,
+      pause,
+      toggle,
+      stop,
+      seek
+    ]
+  )
 }

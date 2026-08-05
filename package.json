@@ -1,7 +1,7 @@
 {
   "name": "resolume-show-control",
   "version": "0.1.0",
-  "description": "Timeline-driven show control for Resolume Arena — single machine (M0 scaffold).",
+  "description": "Timeline-driven show control for Resolume Arena — single machine.",
   "main": "./out/main/index.js",
   "author": "",
   "license": "UNLICENSED",

@@ -12,10 +12,24 @@ import ClipGrid from './components/ClipGrid'
 import SongBank from './components/SongBank'
 import OperatorView from './components/OperatorView'
 
-const DEFAULT_HOST = '172.16.8.27'
+const DEFAULT_HOST = '127.0.0.1'
+const HOST_KEY = 'rsc.host'
 
 export default function App(): JSX.Element {
-  const [host, setHost] = useState(DEFAULT_HOST)
+  const [host, setHost] = useState<string>(() => {
+    try {
+      return localStorage.getItem(HOST_KEY) || DEFAULT_HOST
+    } catch {
+      return DEFAULT_HOST
+    }
+  })
+  useEffect(() => {
+    try {
+      localStorage.setItem(HOST_KEY, host)
+    } catch {
+      /* ignore */
+    }
+  }, [host])
   const [comp, setComp] = useState<CompositionModel | null>(null)
   const [connected, setConnected] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -68,9 +82,22 @@ export default function App(): JSX.Element {
   }, [])
 
   useEffect(() => {
-    connect(DEFAULT_HOST)
-    const timer = window.setTimeout(() => setBooting(false), 1500)
-    return () => window.clearTimeout(timer)
+    let cancelled = false
+    // Splash stays up for at least the theatrical 1500ms, but also waits for connect
+    // to resolve so a slow rig doesn't reveal a half-wired UI. 5s cap so a hung host
+    // (black-holed fetch with no timeout) can't trap the operator behind the splash.
+    Promise.race([
+      Promise.all([
+        new Promise<void>((r) => window.setTimeout(r, 1500)),
+        connect(DEFAULT_HOST).catch(() => {})
+      ]),
+      new Promise<void>((r) => window.setTimeout(r, 5000))
+    ]).then(() => {
+      if (!cancelled) setBooting(false)
+    })
+    return () => {
+      cancelled = true
+    }
   }, [connect])
 
   // Global keys: Space toggles transport, Ctrl/Cmd-S saves the show.
@@ -271,7 +298,7 @@ function BootSplash({ host }: { host: string }): JSX.Element {
   const lines = [
     'BLACKPIXEL SHOW KERNEL ............ OK',
     `RESOLUME LINK ${host}:8080 ....... REST`,
-    'OSC BUS :7000 .................... ARMED',
+    'OSC BUS :7000 ................ STANDBY',
     'LIVE MIRROR ws /api/v1 ........... SUBSCRIBED',
     'AUDIO CLOCK · WEB AUDIO .......... READY',
     'TIMELINE ENGINE .................. LOADED',

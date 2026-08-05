@@ -1,6 +1,7 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { TransportApi } from '../hooks/useTransport'
 import type { ShowApi } from '../show/useShow'
+import type { Trigger } from '../show/types'
 import type { SavedShow, SongMeta } from './types'
 
 export interface SongBankApi {
@@ -94,12 +95,27 @@ export function useSongBank(t: TransportApi, show: ShowApi): SongBankApi {
 
   const persist = useCallback(
     async (id?: string) => {
-      const showData = buildShow()
-      const res = await window.bank.save(showData, id)
-      setCurrentId(res.id)
-      setSavedSig(signature(showData.name, showData.audioPath, showData.bpm, showData.beatOffset, showData.cues))
-      if (!name) setName(showData.name)
-      await refresh()
+      // Cancel any pending autosave debounce — this manual save supersedes it.
+      if (debounceTimer.current) {
+        window.clearTimeout(debounceTimer.current)
+        debounceTimer.current = null
+      }
+      // Serialize against any in-flight save (manual or autosave). Two concurrent
+      // writes to the same show file race on last-writer-wins; chaining guarantees
+      // the later save sees the earlier save's currentId and the writes order cleanly.
+      const run = async (): Promise<void> => {
+        const showData = buildShow()
+        const res = await window.bank.save(showData, id)
+        setCurrentId(res.id)
+        setSavedSig(
+          signature(showData.name, showData.audioPath, showData.bpm, showData.beatOffset, showData.cues)
+        )
+        if (!name) setName(showData.name)
+        await refresh()
+      }
+      const p = saveChain.current.then(run, run)
+      saveChain.current = p
+      await p
     },
     [buildShow, name, refresh]
   )
@@ -114,8 +130,11 @@ export function useSongBank(t: TransportApi, show: ShowApi): SongBankApi {
 
   const loadShow = useCallback(
     async (id: string) => {
-      const s = await window.bank.load(id)
-      if (!s) return
+      const loaded = await window.bank.load(id)
+      if (!loaded) return
+      // Main types cues as unknown[]; isValidShow already validated each cue's shape at
+      // the load boundary, so this cast to the renderer's Trigger[] view is safe.
+      const s = loaded as SavedShow
       show.loadTriggers(s.cues)
       t.setBpm(s.bpm)
       t.setBeatOffset(s.beatOffset)
@@ -166,27 +185,56 @@ export function useSongBank(t: TransportApi, show: ShowApi): SongBankApi {
   // Debounced autosave — only once a show has been saved at least once (has an id).
   const saveRef = useRef(save)
   saveRef.current = save
+  const debounceTimer = useRef<number | null>(null)
+  const saveChain = useRef<Promise<unknown>>(Promise.resolve())
   useEffect(() => {
     if (!currentId || !dirty) return
-    const h = window.setTimeout(() => void saveRef.current(), 1200)
-    return () => window.clearTimeout(h)
+    debounceTimer.current = window.setTimeout(() => {
+      debounceTimer.current = null
+      void saveRef.current()
+    }, 1200)
+    return () => {
+      if (debounceTimer.current) {
+        window.clearTimeout(debounceTimer.current)
+        debounceTimer.current = null
+      }
+    }
   }, [sig, currentId, dirty])
 
-  return {
-    library,
-    currentId,
-    name,
-    audioName,
-    audioMissing,
-    dirty,
-    setName,
-    refresh,
-    openAudio,
-    loadDropped,
-    save,
-    saveAsNew,
-    loadShow,
-    deleteShow,
-    newShow
-  }
+  return useMemo<SongBankApi>(
+    () => ({
+      library,
+      currentId,
+      name,
+      audioName,
+      audioMissing,
+      dirty,
+      setName,
+      refresh,
+      openAudio,
+      loadDropped,
+      save,
+      saveAsNew,
+      loadShow,
+      deleteShow,
+      newShow
+    }),
+    [
+      library,
+      currentId,
+      name,
+      audioName,
+      audioMissing,
+      dirty,
+      setName,
+      refresh,
+      openAudio,
+      loadDropped,
+      save,
+      saveAsNew,
+      loadShow,
+      deleteShow,
+      newShow
+    ]
+  )
 }

@@ -1,5 +1,10 @@
 import type { Trigger } from '../show/types'
+import type { Bank } from '../../../preload'
 
+// Renderer-side typed view of a persisted show. Main's SavedShow (in main/songbank.ts)
+// types `cues` as unknown[] because main is deliberately decoupled from the Trigger
+// schema. Main's isValidShow validates cue shape at the load boundary, so the renderer
+// can safely use this richer type downstream — see the cast in useSongBank.loadShow.
 export interface SavedShow {
   version: 1
   name: string
@@ -25,18 +30,13 @@ export interface AudioPayload {
   data: ArrayBuffer
 }
 
-export interface BankApi {
-  list: () => Promise<SongMeta[]>
-  save: (show: SavedShow, id?: string) => Promise<{ id: string }>
-  load: (id: string) => Promise<SavedShow | null>
-  remove: (id: string) => Promise<boolean>
-  readAudio: (path: string) => Promise<AudioPayload | null>
-  openAudio: () => Promise<{ path: string; name: string; data: ArrayBuffer } | null>
-  pathForFile: (file: File) => string
-}
+// BankApi is the IPC method surface — sourced from the preload implementation so the
+// two can't drift. SavedShow above is the renderer's typed view of what crosses that
+// surface; the structural mismatch on `cues` is resolved at the load boundary.
+export type BankApi = Bank
 
 declare global {
   interface Window {
-    bank: BankApi
+    bank: Bank
   }
 }

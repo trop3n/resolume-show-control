@@ -1,32 +1,13 @@
-export interface ClipModel {
-  index: number
-  name: string
-  connected: string
-  hasContent: boolean
-}
-export interface LayerModel {
-  index: number
-  name: string
-  bypassed: boolean
-  clips: ClipModel[]
-}
-export interface CompositionModel {
-  name: string
-  layers: LayerModel[]
-}
+import type { Api } from '../../preload'
 
-export interface ResolumeApi {
-  connect: (host: string) => Promise<CompositionModel>
-  getComposition: () => Promise<CompositionModel | null>
-  fireClip: (layer: number, clip: number) => Promise<boolean>
-  fireColumn: (column: number) => Promise<boolean>
-  disconnectAll: () => Promise<boolean>
-  onState: (cb: (m: CompositionModel) => void) => () => void
-  onStatus: (cb: (s: { connected: boolean }) => void) => () => void
-}
+// The renderer's view of the composition mirror and the IPC surface. Both are typed from
+// the preload's exposed implementations (single source of truth) — see preload/index.ts.
+// Re-exported here under the historical names so existing imports keep working.
+export type { CompositionModel, ClipModel, LayerModel } from '../../main/resolume-client'
+export type ResolumeApi = Api
 
 declare global {
   interface Window {
-    api: ResolumeApi
+    api: Api
   }
 }

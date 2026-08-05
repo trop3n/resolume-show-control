@@ -36,8 +36,9 @@ their exact moments over OSC while mirroring live state from Arena over REST/Web
 ```
 
 Firing goes over **OSC** (low latency); discovery, thumbnails and live state come over
-**REST + WebSocket**. The **look-ahead scheduler** (Web Audio clock, ~120 ms schedule
-window on a ~25 ms tick) is what keeps triggers on the frame instead of drifting.
+**REST + WebSocket**. A **crossing-detection scheduler** polls the Web Audio clock on a
+15 ms tick and fires each cue as the playhead crosses it — OSC has no future-scheduling
+API, so this is what keeps triggers on the frame instead of drifting.
 
 ## v1 feature set
 
@@ -46,7 +47,7 @@ window on a ~25 ms tick) is what keeps triggers on the frame instead of drifting
 2. Live clip grid mirroring Arena — click to trigger by hand; active clips reflected via WebSocket.
 3. Song loader → waveform → transport (play/stop/seek/playhead) + BPM (manual + tap) + beat/bar grid.
 4. Multi-lane timeline: one lane per layer + a Columns lane; add/drag/delete triggers; snap to beat/bar.
-5. Show engine: look-ahead scheduler firing OSC on playback + panic/blackout.
+5. Show engine: crossing-detection scheduler firing OSC on playback + panic/blackout.
 6. Song Bank: save/load songs (audio + timeline + BPM), batch import, library UI.
 7. Local persistence (JSON shows, autosave) + console aesthetic + status bar (BPM/TC/connection).
 
@@ -123,7 +124,7 @@ elsewhere).
 - **SNAP** toggle: OFF / BEAT / BAR. Live playhead scrubs across ruler, waveform and lanes together.
 
 **M3 — show engine** (the timeline now drives Resolume)
-- a **look-ahead-style scheduler** on the Web Audio clock: as the playhead crosses each cue it
+- a **crossing-detection scheduler** on the Web Audio clock (15 ms tick): as the playhead crosses each cue it
   fires the clip/column over OSC, on the beat, with a green flash on the cue;
 - **ARM / SAFE**: the engine starts **SAFE** — playback rehearses audio only and fires nothing until
   you explicitly **ARM**. Manual clip-grid clicks are always live (an explicit operator action);

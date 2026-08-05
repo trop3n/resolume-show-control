@@ -2,6 +2,10 @@ import dgram from 'node:dgram'
 import { EventEmitter } from 'node:events'
 import WebSocket from 'ws'
 
+// OSC traffic logging is opt-in via RSC_DEBUG_OSC=1 — during a dense show the per-fire
+// line floods the main-process terminal and isn't useful unless actively debugging.
+const DEBUG_OSC = process.env.RSC_DEBUG_OSC === '1'
+
 // ---- Simplified model the UI consumes -------------------------------------
 export interface ClipModel {
   index: number // 1-based
@@ -97,8 +101,7 @@ export class ResolumeClient extends EventEmitter {
   }
 
   private sendOsc(address: string, arg = 1, type: 'i' | 'f' = 'i'): void {
-    // eslint-disable-next-line no-console
-    console.log(`[osc→${this.host}:${this.oscPort}] ${address} ${arg}`)
+    if (DEBUG_OSC) console.log(`[osc→${this.host}:${this.oscPort}] ${address} ${arg}`)
     this.osc.send(this.encodeOsc(address, arg, type), this.oscPort, this.host)
   }
 

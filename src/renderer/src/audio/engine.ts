@@ -67,11 +67,13 @@ class AudioEngine {
 
   async load(data: ArrayBuffer): Promise<AudioBuffer> {
     const ctx = this.ensure()
+    // Pause the current source before decoding so a failed decode doesn't leave the
+    // previous track playing under a "decode failed" toast. Position is preserved by
+    // pause(), so the operator can press play to resume if the new load fails.
+    this.pause()
     const buf = await ctx.decodeAudioData(data)
-    this.hardStop()
     this.buffer = buf
     this.startOffset = 0
-    this._state = 'stopped'
     this._epoch++
     this.emit()
     return buf

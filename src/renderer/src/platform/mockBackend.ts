@@ -3,7 +3,11 @@
 // It stands in for Resolume + the filesystem so the UI is fully explorable for design,
 // with NO live output and localStorage instead of real saved files.
 import type { CompositionModel, ResolumeApi } from '../types'
-import type { AudioPayload, BankApi, SavedShow, SongMeta } from '../persist/types'
+import type { BankApi } from '../persist/types'
+// Wire types — the mock stands in for main, so it speaks main's schema (where cues are
+// unknown[] rather than the renderer's Trigger[]). Path intentionally crosses into main
+// to mirror what the real IPC returns.
+import type { AudioPayload, SavedShow, SongMeta } from '../../../main/songbank'
 
 const CLIP_NAMES = [
   'Intro Loop',
@@ -179,7 +183,6 @@ export function installMockBackend(): boolean {
   comp = makeComp()
   window.api = api
   window.bank = bank
-  // eslint-disable-next-line no-console
   console.info('%c[preview] mock backend — UI only, no live Resolume, localStorage saves', 'color:#22d3ee')
   return true
 }
