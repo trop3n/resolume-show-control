@@ -1577,3 +1577,8 @@ input:focus-visible {
   color: var(--dim);
   font-size: 11px;
 }
+
+.previz-problem {
+  color: var(--warn);
+  font-size: 11px;
+}

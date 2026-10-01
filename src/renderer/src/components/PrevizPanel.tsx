@@ -13,18 +13,21 @@ export default function PrevizPanel({
   const [surfaces, setSurfaces] = useState<PrevizSurface[]>([])
   const [assignments, setAssignments] = useState<PrevizAssignment[]>([])
   const [busy, setBusy] = useState('')
+  const [problem, setProblem] = useState('')
 
   const refresh = useCallback(async (): Promise<void> => {
-    const [isOpen, foundSources, foundSurfaces, assigned] = await Promise.all([
+    const [isOpen, foundSources, foundSurfaces, assigned] = await Promise.allSettled([
       window.previz.isOpen(),
       window.previz.sources(),
       window.previz.surfaces(),
       window.previz.assignments()
     ])
-    setWindowOpen(isOpen)
-    setSources(foundSources)
-    setSurfaces(foundSurfaces)
-    setAssignments(assigned)
+    if (isOpen.status === 'fulfilled') setWindowOpen(isOpen.value)
+    if (foundSources.status === 'fulfilled') setSources(foundSources.value)
+    if (foundSurfaces.status === 'fulfilled') setSurfaces(foundSurfaces.value)
+    if (assigned.status === 'fulfilled') setAssignments(assigned.value)
+    const failed = [isOpen, foundSources, foundSurfaces, assigned].find((r) => r.status === 'rejected')
+    setProblem(failed ? String((failed as PromiseRejectedResult).reason) : '')
   }, [])
 
   useEffect(() => {
@@ -38,10 +41,19 @@ export default function PrevizPanel({
 
   const pick = async (surfaceId: string, sourceId: string): Promise<void> => {
     setBusy(surfaceId)
-    if (sourceId === '') await window.previz.unassign(surfaceId)
-    else await window.previz.assign(surfaceId, sourceId)
-    setBusy('')
-    await refresh()
+    setProblem('')
+    try {
+      const done =
+        sourceId === ''
+          ? await window.previz.unassign(surfaceId)
+          : await window.previz.assign(surfaceId, sourceId)
+      if (!done) setProblem('That window could not be captured — it may have closed or minimised.')
+    } catch (err) {
+      setProblem(String(err))
+    } finally {
+      setBusy('')
+      await refresh()
+    }
   }
 
   const openWindow = async (): Promise<void> => {
@@ -79,9 +91,10 @@ export default function PrevizPanel({
           </div>
           <div className="previz-hint">
             {windowOpen
-              ? 'Each surface can show a window from this computer.'
+              ? 'Each surface can show a window from this computer. Minimised windows are not listed.'
               : 'Open the previz window to put live content on its surfaces.'}
           </div>
+          {problem !== '' && <div className="previz-problem">{problem}</div>}
         </section>
 
         <div className="previz-list">

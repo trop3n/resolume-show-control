@@ -121,16 +121,21 @@ export async function sources(): Promise<DesktopSource[]> {
     types: ['window', 'screen'],
     thumbnailSize: { width: 0, height: 0 }
   })
-  return found
-    .filter((s) => s.name.trim() !== '')
-    .map((s) => ({ id: s.id, name: s.name }))
+  const listed = found.filter((s) => s.name.trim() !== '').map((s) => ({ id: s.id, name: s.name }))
+  console.log(`previz: ${listed.length} capturable sources`)
+  return listed
 }
 
 export async function surfaces(): Promise<PrevizSurface[]> {
   if (!isPrevizOpen()) return []
-  return win!.webContents.executeJavaScript(
-    'window.previzHost ? window.previzHost.surfaces() : []'
-  ) as Promise<PrevizSurface[]>
+  try {
+    return (await win!.webContents.executeJavaScript(
+      'window.previzHost ? window.previzHost.surfaces() : []'
+    )) as PrevizSurface[]
+  } catch (err) {
+    console.error('previz: could not read surfaces from the viewer', err)
+    return []
+  }
 }
 
 export function assignmentList(): PrevizAssignment[] {
@@ -151,7 +156,8 @@ export async function assign(surfaceId: string, sourceId: string): Promise<boole
     await win!.webContents.executeJavaScript(
       `window.previzHost.capture(${JSON.stringify(surfaceId)})`
     )
-  } catch {
+  } catch (err) {
+    console.error(`previz: capturing "${source.name}" for ${surfaceId} failed`, err)
     return false
   } finally {
     pending = null
@@ -197,8 +203,17 @@ export async function openPrevizWindow(): Promise<boolean> {
   const previzSession = session.fromPartition(PARTITION)
 
   previzSession.setDisplayMediaRequestHandler((_request, callback) => {
-    if (pending) callback({ video: pending })
-    else callback({})
+    if (!pending) {
+      // Electron throws "Video was requested, but no video stream was provided" if we answer
+      // an empty object, and the throw lands as an uncaught exception in main.
+      try {
+        callback({})
+      } catch {
+        /* request denied */
+      }
+      return
+    }
+    callback({ video: pending })
   })
   previzSession.setPermissionRequestHandler((_contents, permission, callback, details) => {
     const allowed = permission === 'display-capture' || permission === 'media'
@@ -226,7 +241,7 @@ export async function openPrevizWindow(): Promise<boolean> {
   })
   win.webContents.setWindowOpenHandler(() => ({ action: 'deny' }))
 
-  await win.loadURL(`${origin}/`)
+  await win.loadURL(`${origin}/?host=1`)
   await restore()
   return true
 }
