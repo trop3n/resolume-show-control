@@ -11,6 +11,7 @@ import Timeline from './components/Timeline'
 import ClipGrid from './components/ClipGrid'
 import SongBank from './components/SongBank'
 import OperatorView from './components/OperatorView'
+import PrevizPanel from './components/PrevizPanel'
 
 const DEFAULT_HOST = '127.0.0.1'
 const HOST_KEY = 'rsc.host'
@@ -38,6 +39,7 @@ export default function App(): JSX.Element {
   const [armed, setArmed] = useState(false)
   const [firedIds, setFiredIds] = useState<Set<string>>(() => new Set())
   const [bankOpen, setBankOpen] = useState(false)
+  const [previzOpen, setPrevizOpen] = useState(false)
   const [operator, setOperator] = useState(false)
   // Fire all cues this many ms early to compensate for output latency. Persisted per
   // install (a rig property, not per-show); positive = fire earlier.
@@ -211,6 +213,9 @@ export default function App(): JSX.Element {
           <button className="btn" onClick={() => connect(host)}>
             CONNECT
           </button>
+          <button className="btn" onClick={() => setPrevizOpen(true)}>
+            PREVIZ
+          </button>
           <span className={`led ${connected ? 'ok' : 'off'}`}>{connected ? 'LINKED' : 'NO LINK'}</span>
         </div>
       </header>
@@ -276,6 +281,8 @@ export default function App(): JSX.Element {
       />
 
       <SongBank bank={bank} open={bankOpen} onClose={() => setBankOpen(false)} />
+
+      <PrevizPanel open={previzOpen} onClose={() => setPrevizOpen(false)} />
 
       {operator && (
         <OperatorView

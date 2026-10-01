@@ -2,7 +2,7 @@
 // `window.api` is absent (i.e. running under `npm run web`, not inside Electron).
 // It stands in for Resolume + the filesystem so the UI is fully explorable for design,
 // with NO live output and localStorage instead of real saved files.
-import type { CompositionModel, ResolumeApi } from '../types'
+import type { CompositionModel, PrevizApi, PrevizAssignment, ResolumeApi } from '../types'
 import type { BankApi } from '../persist/types'
 // Wire types — the mock stands in for main, so it speaks main's schema (where cues are
 // unknown[] rather than the renderer's Trigger[]). Path intentionally crosses into main
@@ -178,11 +178,57 @@ const bank: BankApi = {
   pathForFile: () => ''
 }
 
+// Previz: the real one opens a second Electron window and captures OS windows, neither of
+// which exists in a browser. Assignments live in memory so the panel is still explorable.
+const MOCK_SOURCES = [
+  { id: 'window:1', name: 'NDI - RESOLUMEWORKSTATION.LOCAL (Arena - LED Wall Previz) (3072x1408/60p)' },
+  { id: 'window:2', name: 'Resolume Arena' },
+  { id: 'window:3', name: 'ProPresenter' },
+  { id: 'screen:0', name: 'Entire screen' }
+]
+const MOCK_SURFACES = [
+  { id: 'led', name: 'LED Wall', kind: 'led' },
+  { id: 'imag-hl', name: 'Side Screen, House Left', kind: 'led' },
+  { id: 'imag-hr', name: 'Side Screen, House Right', kind: 'led' },
+  { id: 'projection', name: 'Balcony Projection', kind: 'projection' }
+]
+let mockOpen = false
+let mockAssignments: PrevizAssignment[] = []
+
+const previz: PrevizApi = {
+  open: async () => {
+    mockOpen = true
+    return true
+  },
+  close: async () => {
+    mockOpen = false
+    return true
+  },
+  isOpen: async () => mockOpen,
+  sources: async () => MOCK_SOURCES,
+  surfaces: async () => (mockOpen ? MOCK_SURFACES : []),
+  assignments: async () => mockAssignments,
+  assign: async (surfaceId, sourceId) => {
+    const source = MOCK_SOURCES.find((s) => s.id === sourceId)
+    if (!source || !mockOpen) return false
+    mockAssignments = [
+      ...mockAssignments.filter((a) => a.surfaceId !== surfaceId),
+      { surfaceId, sourceName: source.name }
+    ]
+    return true
+  },
+  unassign: async (surfaceId) => {
+    mockAssignments = mockAssignments.filter((a) => a.surfaceId !== surfaceId)
+    return true
+  }
+}
+
 export function installMockBackend(): boolean {
   if (window.api) return false // real Electron preload is present
   comp = makeComp()
   window.api = api
   window.bank = bank
+  window.previz = previz
   console.info('%c[preview] mock backend — UI only, no live Resolume, localStorage saves', 'color:#22d3ee')
   return true
 }

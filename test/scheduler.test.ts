@@ -2,6 +2,7 @@
 // Run with:  npm test   (Node 22+ strips the TS types)
 import { schedulerStep, type SchedState } from '../src/renderer/src/show/schedulerCore.ts'
 import type { Trigger } from '../src/renderer/src/show/types.ts'
+import { matchSource, normaliseSourceName } from '../src/main/previz-sources.ts'
 
 let pass = 0
 let fail = 0
@@ -144,6 +145,40 @@ function run(triggers: Trigger[], ticks: Array<[number, number]>, start: SchedSt
     JSON.stringify(fired) === JSON.stringify(['later']),
     `arm mid-song no retro-fire: got ${fired}`
   )
+}
+
+// 9. Previz source matching survives a window title whose resolution changed.
+{
+  const saved = 'NDI - RESOLUMEWORKSTATION.LOCAL (Arena - LED Wall Previz) (3072x1408/60p)'
+  const now = [
+    { id: 'window:2', name: 'Resolume Arena' },
+    { id: 'window:1', name: 'NDI - RESOLUMEWORKSTATION.LOCAL (Arena - LED Wall Previz) (1920x880/30p)' }
+  ]
+  assert(matchSource(saved, now)?.id === 'window:1', 'resolution change still matches')
+  assert(
+    normaliseSourceName(saved) === 'ndi - resolumeworkstation.local (arena - led wall previz)',
+    `normalise drops the resolution: got ${normaliseSourceName(saved)}`
+  )
+}
+
+// 10. An exact title wins even when another source would also normalise to it.
+{
+  const now = [
+    { id: 'a', name: 'ProPresenter (1)' },
+    { id: 'b', name: 'ProPresenter' }
+  ]
+  assert(matchSource('ProPresenter', now)?.id === 'b', 'exact title preferred')
+}
+
+// 11. Ambiguous or missing sources match nothing rather than guessing.
+{
+  const twins = [
+    { id: 'a', name: 'Studio Monitor (1080p)' },
+    { id: 'b', name: 'Studio Monitor (720p)' }
+  ]
+  assert(matchSource('Studio Monitor (4K)', twins) === null, 'ambiguous match refused')
+  assert(matchSource('Gone', [{ id: 'a', name: 'Still here' }]) === null, 'missing source is null')
+  assert(matchSource('', [{ id: 'a', name: 'Anything' }]) === null, 'empty saved name is null')
 }
 
 console.log(`scheduler core: ${pass} passed, ${fail} failed`)

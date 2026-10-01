@@ -11,6 +11,7 @@
     "build": "electron-vite build",
     "preview": "electron-vite preview",
     "start": "electron-vite preview",
+    "sync:previz": "node scripts/sync-previz.mjs",
     "typecheck": "tsc --noEmit",
     "test": "node --experimental-strip-types test/scheduler.test.ts"
   },

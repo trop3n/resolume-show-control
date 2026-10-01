@@ -2,6 +2,17 @@ import { join } from 'node:path'
 import { app, BrowserWindow, ipcMain, session, shell } from 'electron'
 import { ResolumeClient } from './resolume-client'
 import {
+  assign as previzAssign,
+  assignmentList,
+  closePrevizWindow,
+  isPrevizOpen,
+  openPrevizWindow,
+  sources as previzSources,
+  stopPrevizServer,
+  surfaces as previzSurfaces,
+  unassign as previzUnassign
+} from './previz'
+import {
   listSongs,
   saveSong,
   loadSong,
@@ -106,6 +117,19 @@ app.whenReady().then(() => {
     return true
   })
 
+  // The previz window runs in its own session, so the CSP above and the renderer's
+  // preload do not apply to it; it only ever loads the bundled viewer from 127.0.0.1.
+  ipcMain.handle('previz:open', async () => openPrevizWindow())
+  ipcMain.handle('previz:close', async () => closePrevizWindow())
+  ipcMain.handle('previz:isOpen', async () => isPrevizOpen())
+  ipcMain.handle('previz:sources', async () => previzSources())
+  ipcMain.handle('previz:surfaces', async () => previzSurfaces())
+  ipcMain.handle('previz:assignments', async () => assignmentList())
+  ipcMain.handle('previz:assign', async (_e, surfaceId: string, sourceId: string) =>
+    previzAssign(surfaceId, sourceId)
+  )
+  ipcMain.handle('previz:unassign', async (_e, surfaceId: string) => previzUnassign(surfaceId))
+
   // Song bank + audio persistence
   ipcMain.handle('bank:list', async () => listSongs())
   ipcMain.handle('bank:save', async (_e, show: SavedShow, id?: string) => saveSong(show, id))
@@ -122,5 +146,6 @@ app.whenReady().then(() => {
 
 app.on('window-all-closed', () => {
   client?.disconnect()
+  stopPrevizServer()
   if (process.platform !== 'darwin') app.quit()
 })

@@ -1,6 +1,8 @@
 import { contextBridge, ipcRenderer, webUtils } from 'electron'
 import type { CompositionModel } from '../main/resolume-client'
 import type { AudioPayload, SavedShow, SongMeta } from '../main/songbank'
+import type { PrevizAssignment, PrevizSurface } from '../main/previz'
+import type { DesktopSource } from '../main/previz-sources'
 
 const api = {
   connect: (host: string): Promise<CompositionModel> => ipcRenderer.invoke('resolume:connect', host),
@@ -46,5 +48,22 @@ const bank = {
 
 contextBridge.exposeInMainWorld('bank', bank)
 
+// The previz window itself is driven from main; the renderer only picks what goes where.
+const previz = {
+  open: (): Promise<boolean> => ipcRenderer.invoke('previz:open'),
+  close: (): Promise<boolean> => ipcRenderer.invoke('previz:close'),
+  isOpen: (): Promise<boolean> => ipcRenderer.invoke('previz:isOpen'),
+  sources: (): Promise<DesktopSource[]> => ipcRenderer.invoke('previz:sources'),
+  surfaces: (): Promise<PrevizSurface[]> => ipcRenderer.invoke('previz:surfaces'),
+  assignments: (): Promise<PrevizAssignment[]> => ipcRenderer.invoke('previz:assignments'),
+  assign: (surfaceId: string, sourceId: string): Promise<boolean> =>
+    ipcRenderer.invoke('previz:assign', surfaceId, sourceId),
+  unassign: (surfaceId: string): Promise<boolean> =>
+    ipcRenderer.invoke('previz:unassign', surfaceId)
+}
+
+contextBridge.exposeInMainWorld('previz', previz)
+
 export type Api = typeof api
 export type Bank = typeof bank
+export type Previz = typeof previz
