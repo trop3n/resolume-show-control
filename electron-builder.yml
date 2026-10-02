@@ -1,0 +1,33 @@
+# The app is copied to the AV team's machines by hand (scp over Tailscale), not downloaded, so
+# there is nothing to sign: SmartScreen and Gatekeeper key off download flags a copied file never
+# carries. Hence a zip to unpack and run rather than an installer.
+appId: org.samc.resolume-show-control
+productName: Resolume Show Control
+
+directories:
+  output: dist
+  buildResources: build
+
+# out/ is what electron-vite emits; everything else (src, probe, test) stays out of the app.
+files:
+  - out/**/*
+  - package.json
+
+# The viewer is read off disk by a static server in the main process, so it must sit OUTSIDE
+# app.asar. previz.ts resolves it as join(process.resourcesPath, 'previz') when packaged, so the
+# destination name here is load-bearing — renaming it breaks the PREVIZ panel silently.
+extraResources:
+  - from: resources/previz
+    to: previz
+
+win:
+  target:
+    - zip
+  # Explicit, and free of the spaces productName would put in the default name: these zips get
+  # copied around with scp.
+  artifactName: resolume-show-control-${version}-win-${arch}.zip
+
+mac:
+  target:
+    - zip
+  category: public.app-category.music

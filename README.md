@@ -163,6 +163,30 @@ audio. It's for fast look-and-feel iteration with real browser DevTools — **UI
 live Resolume output** (browsers can't send OSC), marked by a PREVIEW badge. The real app
 is still `npm run dev` (Electron).
 
+### Packaging and installing
+
+```bash
+npm run dist:win     # -> dist/resolume-show-control-0.1.0-win-x64.zip
+npm run pack         # unpacked build in dist/, for checking a package without zipping it
+```
+
+Both scripts run `sync:previz` first, so a build can never ship a stale viewer. The Windows zip
+cross-builds fine from WSL or Linux — no wine needed. `sync:previz` finds the viewer at
+`../../samc/sanctuary-previz` or as a sibling `../sanctuary-previz` (the layout on the show
+machines); `PREVIZ_SRC` overrides both. No app icon is set, so builds carry the default Electron
+one.
+
+The viewer ships as `extraResources`, landing at `resources/previz` next to `app.asar` — outside
+it, because the main process serves those files off disk. [`previz.ts`](src/main/previz.ts) reads
+`join(process.resourcesPath, 'previz')`, so **renaming that destination breaks the PREVIZ panel
+in packaged builds only**, where it is least likely to be noticed.
+
+**Installing**: unzip and run it; there is nothing to install and no certificate involved. Copy
+the zip to the machine with `scp` over Tailscale rather than downloading it — SmartScreen and
+Gatekeeper trigger on the flags a *downloaded* file carries, which a copied one never gets. If a
+build does arrive as a download, clear it once with right-click -> Properties -> **Unblock** on
+Windows, or `xattr -dr com.apple.quarantine` on macOS.
+
 ## Reference
 
 - REST API: https://resolume.com/docs/restapi/ · https://www.resolume.com/support/en/restapi

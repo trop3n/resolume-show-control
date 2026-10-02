@@ -9,6 +9,8 @@
     "dev": "electron-vite dev",
     "web": "vite --config vite.web.config.ts",
     "build": "electron-vite build",
+    "pack": "npm run sync:previz && npm run build && electron-builder --dir",
+    "dist:win": "npm run sync:previz && npm run build && electron-builder --win zip",
     "preview": "electron-vite preview",
     "start": "electron-vite preview",
     "sync:previz": "node scripts/sync-previz.mjs",
@@ -27,6 +29,7 @@
     "@types/ws": "^8.5.10",
     "@vitejs/plugin-react": "^4.3.1",
     "electron": "^31.3.0",
+    "electron-builder": "^26.15.3",
     "electron-vite": "^2.3.0",
     "typescript": "^5.5.3",
     "vite": "^5.3.4"
