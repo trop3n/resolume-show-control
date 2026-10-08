@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256">
+  <!-- Resolume Show Control. Three timeline lanes crossed by the playhead, in the app's own
+       console palette. Sized so the thinnest element (the playhead, 24px here) still lands on
+       about 1.5px at 16x16, which is what keeps the mark readable in a taskbar. -->
+  <defs>
+    <linearGradient id="ground" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#0f1216"/>
+      <stop offset="1" stop-color="#06070a"/>
+    </linearGradient>
+  </defs>
+
+  <rect width="256" height="256" rx="52" fill="url(#ground)"/>
+  <rect x="1.25" y="1.25" width="253.5" height="253.5" rx="50.75"
+        fill="none" stroke="#1b2026" stroke-width="2.5"/>
+
+  <!-- Lanes, brightest at the top: enough separation that all three survive a downscale. -->
+  <rect x="34" y="61"  width="188" height="30" rx="8" fill="#78848f"/>
+  <rect x="34" y="113" width="188" height="30" rx="8" fill="#59646f"/>
+  <rect x="34" y="165" width="188" height="30" rx="8" fill="#3b4651"/>
+
+  <!-- Playhead, overhanging the lanes top and bottom so it reads as crossing them. -->
+  <rect x="140" y="44" width="24" height="168" rx="12" fill="#22d3ee"/>
+</svg>

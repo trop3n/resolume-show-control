@@ -173,8 +173,14 @@ npm run pack         # unpacked build in dist/, for checking a package without z
 Both scripts run `sync:previz` first, so a build can never ship a stale viewer. The Windows zip
 cross-builds fine from WSL or Linux — no wine needed. `sync:previz` finds the viewer at
 `../../samc/sanctuary-previz` or as a sibling `../sanctuary-previz` (the layout on the show
-machines); `PREVIZ_SRC` overrides both. No app icon is set, so builds carry the default Electron
-one.
+machines); `PREVIZ_SRC` overrides both.
+
+The app icon is [`build/icon.ico`](build/icon.ico), which electron-builder picks up on its own
+because `directories.buildResources` points at `build/`. It holds 16 through 256 px, each
+rendered from [`build/icon-source.svg`](build/icon-source.svg) rather than downscaled from one
+bitmap, which is what keeps the playhead visible at taskbar size. To change it, edit the SVG and
+re-render every size; a 256 px image alone would come out mushy at 16. macOS would additionally
+need an `icon.icns` beside it.
 
 The viewer ships as `extraResources`, landing at `resources/previz` next to `app.asar` — outside
 it, because the main process serves those files off disk. [`previz.ts`](src/main/previz.ts) reads
